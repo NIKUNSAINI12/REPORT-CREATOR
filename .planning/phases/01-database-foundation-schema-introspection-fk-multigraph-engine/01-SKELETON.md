@@ -40,3 +40,4 @@ Each later phase adds one vertical slice on top of this skeleton without alterin
 - **Phase 3:** Module 2A — Complete MS Word Ribbon & Paginated Document Canvas (`/designer`)
 - **Phase 4:** Module 2B/2C & Module 3 — Field Binding, FK Locking, Filter Builder & Dynamic T-SQL Compiler
 - **Phase 5:** Module 4 — Separate Report Runner Page (`/reports/run/:templateId`), Multi-Repeater Merge & Print/PDF/DOCX Export
+

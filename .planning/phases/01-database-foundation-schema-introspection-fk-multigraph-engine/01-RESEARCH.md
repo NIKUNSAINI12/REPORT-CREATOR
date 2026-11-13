@@ -87,3 +87,4 @@ Three governance and template tables must be created idempotently in `TMS_Lite_1
     2. Schema introspection returning `>= 404` base tables and `>= 5,993` columns in `< 500ms`.
     3. Multigraph loading all `341` physical FKs including `14` composite FKs, `14` multi-FK pairs (`CL_Thc_Header` -> `CL_Master_Location` returning 4 distinct edges), `5` self-referencing FKs, plus virtual FKs from `Report_Custom_Relationships`.
     4. Cardinality-aware BFS reachability permitting `N -> 1 -> 1` and `1 -> N -> 1` while blocking `N -> 1 <- N` chasm traps through `CL_Master_Location`.
+

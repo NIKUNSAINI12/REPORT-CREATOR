@@ -1,5 +1,6 @@
 using Dapper;
 using TmsReportDesigner.Api.Data;
+using TmsReportDesigner.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,13 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddSingleton<DatabaseInitializer>();
+builder.Services.AddSingleton<ISchemaIntrospectionService, SchemaIntrospectionService>();
+builder.Services.AddSingleton<IFkGraphService, FkGraphService>();
+builder.Services.AddSingleton<IReachabilityService, ReachabilityService>();
+builder.Services.AddSingleton<ICatalogService, CatalogService>();
+builder.Services.AddSingleton<ISqlCompilerService, SqlCompilerService>();
+builder.Services.AddSingleton<ITemplateService, TemplateService>();
+builder.Services.AddSingleton<IReportExecutionService, ReportExecutionService>();
 
 var app = builder.Build();
 
@@ -54,4 +62,3 @@ app.MapControllers();
 app.Run();
 
 public partial class Program { }
-

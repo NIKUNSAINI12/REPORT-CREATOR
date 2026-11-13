@@ -1,0 +1,38 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "Database Foundation, Schema Introspection & FK Multigraph Engine",
+      "status": "complete"
+    },
+    {
+      "number": "2",
+      "name": "Module 1 — Manager Data Dictionary & Virtual Relationship Portal",
+      "status": "complete"
+    },
+    {
+      "number": "3",
+      "name": "Module 2A — Complete MS Word Ribbon & Paginated Document Canvas",
+      "status": "complete"
+    },
+    {
+      "number": "4",
+      "name": "Module 2B/2C & Module 3 — Field Binding, FK Locking, Filter Builder & Dynamic T-SQL Compiler",
+      "status": "complete"
+    },
+    {
+      "number": "5",
+      "name": "Module 4 — Separate Report Runner Page, Multi-Repeater Merge & Print/PDF/DOCX Export",
+      "status": "complete"
+    }
+  ],
+  "next": {
+    "command": "/gsd-new-milestone",
+    "label": "Start a new milestone",
+    "reason": "All phases complete — start a new milestone"
+  },
+  "updated_at": "2026-11-13T18:01:15.679Z"
+}
