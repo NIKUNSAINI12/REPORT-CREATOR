@@ -136,6 +136,33 @@ public sealed class CatalogService : ICatalogService
         var snapshot = await _fkGraphService.GetSnapshotAsync(cancellationToken);
         var persistedByKey = await LoadPersistedCatalogMapAsync(cancellationToken);
 
+        // Build fast lookup of Foreign Key columns -> Referenced Table.Column
+        var fkLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var edge in snapshot.AllEdges)
+        {
+            if (edge.Cardinality != FkCardinality.ManyToOne)
+            {
+                continue;
+            }
+
+            foreach (var pair in edge.ColumnPairs)
+            {
+                var colKey = BuildCatalogKey(edge.FromSchema, edge.FromTable, pair.ParentColumn);
+                var targetDesc = $"{edge.ToTable}.{pair.ReferencedColumn}";
+                if (fkLookup.TryGetValue(colKey, out var existing))
+                {
+                    if (!existing.Contains(targetDesc, StringComparison.OrdinalIgnoreCase))
+                    {
+                        fkLookup[colKey] = $"{existing}, {targetDesc}";
+                    }
+                }
+                else
+                {
+                    fkLookup[colKey] = targetDesc;
+                }
+            }
+        }
+
         IEnumerable<TableMetadata> targetTables = snapshot.Tables.Values;
         if (!string.IsNullOrWhiteSpace(tableName))
         {
@@ -156,6 +183,7 @@ public sealed class CatalogService : ICatalogService
             {
                 var key = BuildCatalogKey(table.SchemaName, table.TableName, col.ColumnName);
                 var hasPersisted = persistedByKey.TryGetValue(key, out var persisted);
+                var isFk = fkLookup.TryGetValue(key, out var fkTarget);
 
                 var dto = new CatalogColumnDto(
                     FieldId: hasPersisted ? persisted!.FieldId : null,
@@ -173,7 +201,9 @@ public sealed class CatalogService : ICatalogService
                         : defaultCategory,
                     IsFilterable: hasPersisted && persisted!.IsFilterable,
                     IsActive: hasPersisted && persisted!.IsActive,
-                    HasPhysicalForeignKeys: table.HasPhysicalForeignKeys);
+                    HasPhysicalForeignKeys: table.HasPhysicalForeignKeys,
+                    IsForeignKey: isFk,
+                    ForeignKeyTarget: fkTarget);
 
                 list.Add(dto);
             }

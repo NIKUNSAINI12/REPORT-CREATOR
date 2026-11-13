@@ -12,7 +12,9 @@ public sealed record CatalogColumnDto(
     string Category,
     bool IsFilterable,
     bool IsActive,
-    bool HasPhysicalForeignKeys
+    bool HasPhysicalForeignKeys,
+    bool IsForeignKey = false,
+    string? ForeignKeyTarget = null
 );
 
 public sealed record CatalogTableSummaryDto(

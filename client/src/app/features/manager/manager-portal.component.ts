@@ -176,14 +176,22 @@ import {
                   title="Toggle Published / Active for End-Users"
                 />
               </div>
-              <div class="col-raw" [title]="col.tableName + '.' + col.columnName">
+              <div class="col-raw" [title]="col.tableName + '.' + col.columnName + (col.isForeignKey && col.foreignKeyTarget ? ' (FK → ' + col.foreignKeyTarget + ')' : '')">
                 <div class="raw-col-line">
                   <code>{{ col.columnName }}</code>
                   @if (col.isPrimaryKey) {
-                    <span class="pk-badge">PK</span>
+                    <span class="pk-badge" title="Primary Key">PK</span>
+                  }
+                  @if (col.isForeignKey) {
+                    <span class="fk-badge" [title]="'Foreign Key → ' + (col.foreignKeyTarget || 'Referenced Table')">FK</span>
                   }
                 </div>
-                <span class="raw-tbl-sub">{{ col.tableName }}</span>
+                <span class="raw-tbl-sub">
+                  {{ col.tableName }}
+                  @if (col.isForeignKey && col.foreignKeyTarget) {
+                    <span class="fk-target-hint">→ {{ col.foreignKeyTarget }}</span>
+                  }
+                </span>
               </div>
               <div class="col-type">
                 <span class="type-pill">{{ col.dataType }}</span>
@@ -252,7 +260,9 @@ import {
                   <select [(ngModel)]="newRelParentColumn">
                     <option value="">-- Select Column --</option>
                     @for (c of parentTableColumns(); track c.columnName) {
-                      <option [value]="c.columnName">{{ c.columnName }} ({{ c.dataType }})</option>
+                      <option [value]="c.columnName">
+                        {{ c.columnName }} ({{ c.dataType }}){{ c.isPrimaryKey ? ' [PK]' : '' }}{{ c.isForeignKey ? ' [FK → ' + c.foreignKeyTarget + ']' : '' }}
+                      </option>
                     }
                   </select>
                 </div>
@@ -272,7 +282,9 @@ import {
                   <select [(ngModel)]="newRelReferencedColumn">
                     <option value="">-- Select Column --</option>
                     @for (c of referencedTableColumns(); track c.columnName) {
-                      <option [value]="c.columnName">{{ c.columnName }} ({{ c.dataType }})</option>
+                      <option [value]="c.columnName">
+                        {{ c.columnName }} ({{ c.dataType }}){{ c.isPrimaryKey ? ' [PK]' : '' }}{{ c.isForeignKey ? ' [FK → ' + c.foreignKeyTarget + ']' : '' }}
+                      </option>
                     }
                   </select>
                 </div>
@@ -672,6 +684,21 @@ import {
       border-radius: 3px;
       margin-left: 4px;
       font-weight: 700;
+    }
+    .fk-badge {
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #93c5fd;
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-left: 4px;
+      font-weight: 700;
+    }
+    .fk-target-hint {
+      color: #1d4ed8;
+      font-weight: 600;
+      margin-left: 4px;
     }
     .type-pill {
       background: #e2e8f0;

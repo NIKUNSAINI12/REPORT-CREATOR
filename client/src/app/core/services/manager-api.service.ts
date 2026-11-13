@@ -10,6 +10,8 @@ export interface CatalogColumnDto {
   dataType: string;
   isNullable: boolean;
   isPrimaryKey: boolean;
+  isForeignKey?: boolean;
+  foreignKeyTarget?: string | null;
   displayName: string;
   category: string;
   isFilterable: boolean;

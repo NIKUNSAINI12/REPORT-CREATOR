@@ -944,7 +944,15 @@ import {
                         (click)="onFieldClickInsert(fld, grp.isReachable)"
                       >
                         <div class="fld-main">
-                          <span class="fld-alias">{{ fld.displayName }}</span>
+                          <span class="fld-alias">
+                            {{ fld.displayName }}
+                            @if (fld.isPrimaryKey) {
+                              <span class="pk-badge-sm" title="Primary Key">PK</span>
+                            }
+                            @if (fld.isForeignKey) {
+                              <span class="fk-badge-sm" [title]="'Foreign Key → ' + (fld.foreignKeyTarget || 'Linked Table')">FK</span>
+                            }
+                          </span>
                           <code class="fld-col">{{ '{{' + fld.tableName + '.' + fld.displayName + '}}' }}</code>
                         </div>
                         <div class="fld-right">
@@ -2055,6 +2063,27 @@ import {
     .fld-alias {
       font-weight: 600;
       color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .pk-badge-sm {
+      background: #fef08a;
+      color: #854d0e;
+      font-size: 9px;
+      padding: 0 4px;
+      border-radius: 3px;
+      font-weight: 700;
+    }
+    .fk-badge-sm {
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #93c5fd;
+      font-size: 9px;
+      padding: 0 4px;
+      border-radius: 3px;
+      font-weight: 700;
     }
     .fld-col {
       font-size: 10.5px;
