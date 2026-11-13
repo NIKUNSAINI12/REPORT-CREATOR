@@ -86,3 +86,4 @@ Deliver the `.NET 8 Web API` + `Angular 19` workspace structure, provision the S
 
 *Phase: 01-database-foundation-schema-introspection-fk-multigraph-engine*
 *Context gathered: 2026-11-13*
+

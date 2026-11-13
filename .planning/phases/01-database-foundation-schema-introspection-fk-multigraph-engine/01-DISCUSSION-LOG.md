@@ -26,3 +26,4 @@
 
 ### 6. Additional Gap: Multiple `1:N` Repeating Detail Tables & Dynamic Filter Dropdowns
 - **User Selection:** Prevent Cartesian explosion by deduplicating/querying each repeating detail table independently per parent record + auto-populate Filter Dropdowns via `SELECT DISTINCT TOP 500`.
+
