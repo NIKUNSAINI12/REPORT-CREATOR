@@ -249,7 +249,7 @@ import {
     }
     .runner-shell {
       display: grid;
-      grid-template-columns: 340px minmax(0, 1fr);
+      grid-template-columns: 300px minmax(0, 1fr);
       height: 100%;
       min-height: 0;
       overflow: hidden;
@@ -428,12 +428,14 @@ import {
     }
     .preview-toolbar {
       display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 18px;
+      padding: 8px 14px;
       background: #ffffff;
       border-bottom: 1px solid #94a3b8;
-      font-size: 12.5px;
+      font-size: 12px;
     }
     .exec-summary {
       display: flex;

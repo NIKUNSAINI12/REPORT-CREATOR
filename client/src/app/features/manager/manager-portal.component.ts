@@ -152,18 +152,17 @@ import {
 
           <!-- Virtual Scrolled Column Header -->
           <div class="grid-header">
-            <div class="col-pub">Published</div>
-            <div class="col-table">Table Name</div>
-            <div class="col-raw">Physical Column</div>
+            <div class="col-pub">Active</div>
+            <div class="col-raw">Database Column &amp; Table</div>
             <div class="col-type">SQL Type</div>
-            <div class="col-alias">Presentable Alias (DisplayName)</div>
+            <div class="col-alias">Presentable Alias (End-User Display Name)</div>
             <div class="col-cat">Category / Group</div>
-            <div class="col-filt">Filterable</div>
-            <div class="col-act">Action</div>
+            <div class="col-filt">Filter</div>
+            <div class="col-act">Copy / Save</div>
           </div>
 
           <!-- Angular CDK Virtual Scroll Viewport for 6,000 Columns at 60 FPS -->
-          <cdk-virtual-scroll-viewport itemSize="48" class="virtual-grid-viewport">
+          <cdk-virtual-scroll-viewport itemSize="52" class="virtual-grid-viewport">
             <div
               *cdkVirtualFor="let col of filteredColumns(); trackBy: trackByColumn"
               class="grid-row"
@@ -177,12 +176,14 @@ import {
                   title="Toggle Published / Active for End-Users"
                 />
               </div>
-              <div class="col-table" [title]="col.tableName">{{ col.tableName }}</div>
-              <div class="col-raw" [title]="col.columnName">
-                <code>{{ col.columnName }}</code>
-                @if (col.isPrimaryKey) {
-                  <span class="pk-badge">PK</span>
-                }
+              <div class="col-raw" [title]="col.tableName + '.' + col.columnName">
+                <div class="raw-col-line">
+                  <code>{{ col.columnName }}</code>
+                  @if (col.isPrimaryKey) {
+                    <span class="pk-badge">PK</span>
+                  }
+                </div>
+                <span class="raw-tbl-sub">{{ col.tableName }}</span>
               </div>
               <div class="col-type">
                 <span class="type-pill">{{ col.dataType }}</span>
@@ -192,7 +193,7 @@ import {
                   type="text"
                   [(ngModel)]="col.displayName"
                   (blur)="saveSingleColumn(col)"
-                  placeholder="User-friendly alias..."
+                  placeholder="Enter user-friendly alias..."
                 />
               </div>
               <div class="col-cat">
@@ -212,6 +213,13 @@ import {
                 />
               </div>
               <div class="col-act">
+                <button
+                  class="btn-row-copy"
+                  (click)="copyColumnAliasToken(col)"
+                  title="Copy {{ '{{' + col.tableName + '.' + col.displayName + '}}' }} to paste in Word Report Designer"
+                >
+                  📋
+                </button>
                 <button class="btn-row-save" (click)="saveSingleColumn(col)">Save</button>
               </div>
             </div>
@@ -339,9 +347,10 @@ import {
     }
     .manager-shell {
       display: grid;
-      grid-template-columns: 330px minmax(0, 1fr);
+      grid-template-columns: 265px minmax(0, 1fr);
       height: 100%;
       min-height: 0;
+      width: 100%;
       overflow: hidden;
       background: #f8fafc;
     }
@@ -532,69 +541,76 @@ import {
     }
     .sub-toolbar {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 12px;
-      padding: 10px 18px;
+      gap: 8px;
+      padding: 8px 14px;
       background: #f8fafc;
       border-bottom: 1px solid #e2e8f0;
     }
     .col-search-input {
-      flex: 1;
-      padding: 7px 12px;
+      flex: 1 1 200px;
+      min-width: 160px;
+      padding: 6px 10px;
       border: 1px solid #cbd5e1;
       border-radius: 5px;
-      font-size: 13px;
+      font-size: 12.5px;
     }
     .checkbox-inline {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 12.5px;
-      font-weight: 500;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 600;
       color: #334155;
       white-space: nowrap;
     }
     .bulk-actions {
       display: flex;
-      gap: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
     }
     .btn-primary {
       background: #2563eb;
       color: #fff;
       border: none;
-      padding: 7px 12px;
+      padding: 6px 10px;
       border-radius: 5px;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
+      white-space: nowrap;
     }
     .btn-secondary {
       background: #0f172a;
       color: #fff;
       border: none;
-      padding: 7px 12px;
+      padding: 6px 10px;
       border-radius: 5px;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
+      white-space: nowrap;
     }
     .btn-outline {
       background: #fff;
       color: #475569;
       border: 1px solid #cbd5e1;
-      padding: 7px 12px;
+      padding: 6px 10px;
       border-radius: 5px;
-      font-size: 12.5px;
+      font-size: 12px;
       cursor: pointer;
+      white-space: nowrap;
     }
     .grid-header {
       display: grid;
-      grid-template-columns: 80px 190px 190px 100px 1fr 170px 80px 75px;
+      grid-template-columns: 50px minmax(165px, 1.3fr) 78px minmax(210px, 2fr) minmax(120px, 1fr) 50px 96px;
+      gap: 8px;
       align-items: center;
       padding: 8px 16px;
       background: #f1f5f9;
       border-bottom: 1px solid #cbd5e1;
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 700;
       color: #475569;
       text-transform: uppercase;
@@ -606,15 +622,38 @@ import {
       width: 100%;
       background: #ffffff;
       overflow-y: scroll !important;
+      overflow-x: auto !important;
     }
     .grid-row {
       display: grid;
-      grid-template-columns: 80px 190px 190px 100px 1fr 170px 80px 75px;
+      grid-template-columns: 50px minmax(165px, 1.3fr) 78px minmax(210px, 2fr) minmax(120px, 1fr) 50px 96px;
+      gap: 8px;
       align-items: center;
-      height: 48px;
+      height: 52px;
       padding: 0 16px;
       border-bottom: 1px solid #f1f5f9;
       font-size: 12.5px;
+    }
+    .col-pub, .col-filt, .col-act {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+    }
+    .raw-col-line {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .raw-tbl-sub {
+      display: block;
+      font-size: 10.5px;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .grid-row.row-published {
       background: #f0fdf4;
@@ -648,6 +687,20 @@ import {
       border: 1px solid #cbd5e1;
       border-radius: 4px;
       font-size: 12.5px;
+    }
+    .btn-row-copy {
+      background: #f8fafc;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      padding: 4px 7px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      cursor: pointer;
+    }
+    .btn-row-copy:hover {
+      background: #dbeafe;
+      color: #185abd;
+      border-color: #93c5fd;
     }
     .btn-row-save {
       background: #eff6ff;
@@ -816,6 +869,12 @@ export class ManagerPortalComponent implements OnInit {
       },
       error: () => this.busy.set(false)
     });
+  }
+
+  copyColumnAliasToken(col: CatalogColumnDto): void {
+    const token = `{{${col.tableName}.${col.displayName}}}`;
+    navigator.clipboard?.writeText(token).catch(() => {});
+    this.showToast(`Copied ${token} — Paste (Ctrl+V) anywhere in Word Report Designer!`);
   }
 
   saveSingleColumn(col: CatalogColumnDto): void {

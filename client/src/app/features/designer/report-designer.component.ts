@@ -1,6 +1,7 @@
 import {
   Component,
   ElementRef,
+  OnDestroy,
   OnInit,
   ViewChild,
   computed,
@@ -33,68 +34,137 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="designer-root" (click)="closeContextMenus()">
-      <!-- Top Template Bar -->
-      <div class="template-bar">
-        <div class="template-meta">
-          <select
-            class="template-picker"
-            [ngModel]="currentTemplateId()"
-            (ngModelChange)="onSelectExistingTemplate($event)"
-          >
-            <option [ngValue]="null">+ New Blank Report Template</option>
-            @for (tpl of savedTemplates(); track tpl.templateId) {
-              <option [ngValue]="tpl.templateId">
-                #{{ tpl.templateId }} — {{ tpl.templateName }} ({{ tpl.anchorTableName || 'Unbound' }})
-              </option>
+    <div
+      class="designer-root"
+      [class.fullscreen-mode]="isFullScreen()"
+      (click)="closeContextMenus()"
+      (wheel)="onCanvasWheelZoom($event)"
+    >
+      <!-- Top MS Word 365 Title & Template Command Bar (Hidden in Full Screen Mode so ONLY Ribbon + Page + Fields show) -->
+      @if (!isFullScreen()) {
+        <div class="template-bar">
+          <div class="template-meta">
+            <span class="word-app-badge" title="Microsoft Word-Style Report Designer">W</span>
+            <select
+              class="template-picker"
+              [ngModel]="currentTemplateId()"
+              (ngModelChange)="onSelectExistingTemplate($event)"
+            >
+              <option [ngValue]="null">+ New Blank Report Template</option>
+              @for (tpl of savedTemplates(); track tpl.templateId) {
+                <option [ngValue]="tpl.templateId">
+                  #{{ tpl.templateId }} — {{ tpl.templateName }} ({{ tpl.anchorTableName || 'Unbound' }})
+                </option>
+              }
+            </select>
+
+            <input
+              type="text"
+              class="template-name-input"
+              [(ngModel)]="templateName"
+              placeholder="Report Template Title..."
+            />
+
+            <select class="doc-mode-select" [(ngModel)]="documentMode">
+              <option value="SingleOrBatchDocument">Mode: Single / Batch Document (1 Doc per Anchor PK)</option>
+              <option value="SummaryList">Mode: Summary Register List (Continuous Table)</option>
+            </select>
+          </div>
+
+          <div class="template-actions">
+            @if (statusToast()) {
+              <span class="save-toast">{{ statusToast() }}</span>
             }
-          </select>
-
-          <input
-            type="text"
-            class="template-name-input"
-            [(ngModel)]="templateName"
-            placeholder="Report Template Title..."
-          />
-
-          <select class="doc-mode-select" [(ngModel)]="documentMode">
-            <option value="SingleOrBatchDocument">Mode: Single / Batch Document (1 Doc per Anchor PK)</option>
-            <option value="SummaryList">Mode: Summary Register List (Continuous Table)</option>
-          </select>
+            <button
+              class="btn-window-mode"
+              (click)="isRightSidebarOpen.set(!isRightSidebarOpen())"
+              title="Show or Hide Right Database Fields Panel"
+            >
+              {{ isRightSidebarOpen() ? '◨ Hide Fields Panel' : '◧ Show Fields Panel' }}
+            </button>
+            <button
+              class="btn-fullscreen-toggle"
+              [class.active-fs]="isFullScreen()"
+              (click)="toggleFullScreen()"
+              title="Full Screen Mode (Shows ONLY Word Ribbon, Page & Side Field Section)"
+            >
+              ⛶ Full Screen Mode
+            </button>
+            <button class="btn-sql-toggle" (click)="showSqlDrawer.set(!showSqlDrawer())">
+              {{ showSqlDrawer() ? 'Hide SQL' : '⚡ Auto-SQL' }}
+            </button>
+            <button class="btn-save" (click)="saveTemplate()" [disabled]="saving()">
+              💾 {{ currentTemplateId() ? 'Update' : 'Save' }}
+            </button>
+            <button class="btn-run" (click)="saveAndRunReport()" [disabled]="saving()">
+              ▶ Run &amp; Export
+            </button>
+          </div>
         </div>
+      }
 
-        <div class="template-actions">
-          @if (statusToast()) {
-            <span class="save-toast">{{ statusToast() }}</span>
-          }
-          <button class="btn-sql-toggle" (click)="showSqlDrawer.set(!showSqlDrawer())">
-            {{ showSqlDrawer() ? 'Hide SQL' : '⚡ View Auto-Compiled SQL' }}
-          </button>
-          <button class="btn-save" (click)="saveTemplate()" [disabled]="saving()">
-            💾 {{ currentTemplateId() ? 'Update Template' : 'Save Template' }}
-          </button>
-          <button class="btn-run" (click)="saveAndRunReport()" [disabled]="saving()">
-            ▶ Run &amp; Export Report
-          </button>
-        </div>
-      </div>
-
-      <!-- MS Word 5-Tab Ribbon -->
+      <!-- Modern Microsoft Word 365 Fluent Ribbon -->
       <div class="word-ribbon">
-        <div class="ribbon-tabs">
-          <button [class.active]="ribbonTab() === 'home'" (click)="ribbonTab.set('home')">Home</button>
-          <button [class.active]="ribbonTab() === 'insert'" (click)="ribbonTab.set('insert')">Insert</button>
-          <button
-            [class.active]="ribbonTab() === 'table'"
-            [class.contextual-tab]="isCursorInTable()"
-            (click)="ribbonTab.set('table')"
-          >
-            Table Design &amp; Layout {{ isCursorInTable() ? '●' : '' }}
-          </button>
-          <button [class.active]="ribbonTab() === 'layout'" (click)="ribbonTab.set('layout')">Layout (Page Setup)</button>
-          <button [class.active]="ribbonTab() === 'view'" (click)="ribbonTab.set('view')">View</button>
+        <div class="ribbon-tabs-row">
+          <div class="ribbon-tabs">
+            <button [class.active]="ribbonTab() === 'home'" (click)="ribbonTab.set('home'); isRibbonCollapsed.set(false)">Home</button>
+            <button [class.active]="ribbonTab() === 'insert'" (click)="ribbonTab.set('insert'); isRibbonCollapsed.set(false)">Insert</button>
+            <button [class.active]="ribbonTab() === 'layout'" (click)="ribbonTab.set('layout'); isRibbonCollapsed.set(false)">Layout</button>
+            <button [class.active]="ribbonTab() === 'view'" (click)="ribbonTab.set('view'); isRibbonCollapsed.set(false)">View</button>
+            <button
+              [class.active]="ribbonTab() === 'table'"
+              [class.contextual-tab]="isCursorInTable()"
+              (click)="ribbonTab.set('table'); isRibbonCollapsed.set(false)"
+            >
+              Table Design &amp; Layout {{ isCursorInTable() ? '●' : '' }}
+            </button>
+            <button
+              [class.active]="ribbonTab() === 'object'"
+              [class.contextual-tab]="hasSelectedObject()"
+              (click)="ribbonTab.set('object'); isRibbonCollapsed.set(false)"
+            >
+              🔄 Shape &amp; Object Format (Rotate / Size) {{ hasSelectedObject() ? '●' : '' }}
+            </button>
+          </div>
+
+          <div class="ribbon-right-quick">
+            @if (statusToast() && isFullScreen()) {
+              <span class="save-toast">{{ statusToast() }}</span>
+            }
+            <button class="quick-zoom-btn" (click)="zoomPercent.set(Math.max(40, zoomPercent() - 10))" title="Zoom Out Page">−</button>
+            <span class="quick-zoom-lbl" (click)="zoomPercent.set(80)" title="Touchpad Pinch or Click to Reset Page Zoom (80%)">{{ zoomPercent() }}%</span>
+            <button class="quick-zoom-btn" (click)="zoomPercent.set(Math.min(220, zoomPercent() + 10))" title="Zoom In Page">+</button>
+            <button class="quick-zoom-btn" (click)="zoomPercent.set(75)" title="Fit Page to Screen">Fit Page</button>
+            <button
+              class="quick-zoom-btn"
+              (click)="isRightSidebarOpen.set(!isRightSidebarOpen())"
+              title="Show or Hide Right Fields Section"
+            >
+              {{ isRightSidebarOpen() ? '◨ Fields' : '◧ Fields' }}
+            </button>
+            @if (isFullScreen()) {
+              <button class="quick-save-btn" (click)="saveTemplate()" [disabled]="saving()">💾 Save</button>
+              <button class="quick-run-btn" (click)="saveAndRunReport()" [disabled]="saving()">▶ Run</button>
+            }
+            <button
+              class="quick-fs-btn"
+              [class.active-fs]="isFullScreen()"
+              (click)="toggleFullScreen()"
+              title="Toggle Full Screen (Shows ONLY Ribbon, Page & Side Field Section) or Reduce"
+            >
+              {{ isFullScreen() ? '🗗 Reduce (Exit Full Screen)' : '⛶ Full Screen' }}
+            </button>
+            <button
+              class="btn-collapse-ribbon"
+              (click)="isRibbonCollapsed.set(!isRibbonCollapsed())"
+              [title]="isRibbonCollapsed() ? 'Expand Ribbon' : 'Collapse Ribbon'"
+            >
+              {{ isRibbonCollapsed() ? '⌄ Expand' : '⌃' }}
+            </button>
+          </div>
         </div>
 
+        @if (!isRibbonCollapsed()) {
         <div class="ribbon-body">
           <!-- TAB 1: HOME (Clipboard, Typography, Styles, Paragraph & Lists) -->
           @if (ribbonTab() === 'home') {
@@ -104,7 +174,16 @@ import {
                 <button title="Redo (Ctrl+Y)" (click)="execCmd('redo')">↪ Redo</button>
                 <button title="Cut" (click)="execCmd('cut')">✂ Cut</button>
                 <button title="Copy" (click)="execCmd('copy')">📋 Copy</button>
-                <button title="Paste Plain Text" (click)="pastePlainText()">📄 Paste</button>
+                <button title="Paste Plain Text or Copied Tag" (click)="pastePlainText()">📄 Paste</button>
+                @if (lastCopiedField(); as copiedFld) {
+                  <button
+                    class="btn-accent"
+                    [title]="'Insert copied field: ' + copiedFld.displayName"
+                    (click)="pasteCopiedFieldTag()"
+                  >
+                    🏷 Paste {{ copiedFld.displayName }}
+                  </button>
+                }
                 <button
                   title="Format Painter"
                   [class.active-tool]="formatPainterActive()"
@@ -116,104 +195,109 @@ import {
                   🔍 Find
                 </button>
               </div>
-              <div class="group-label">Clipboard &amp; History</div>
+              <div class="group-label">Clipboard</div>
             </div>
 
             <div class="ribbon-group">
               <div class="group-controls">
-                <select [ngModel]="selectedFontFamily" (ngModelChange)="applyFontFamily($event)" title="Font Family">
+                <select class="font-family-select" [ngModel]="selectedFontFamily" (ngModelChange)="applyFontFamily($event)" title="Font Family">
                   @for (f of fontFamilies; track f) {
                     <option [value]="f">{{ f }}</option>
                   }
                 </select>
-                <select [ngModel]="selectedFontSizePt" (ngModelChange)="applyFontSizePt($event)" title="Font Size (pt)">
+                <select class="font-size-select" [ngModel]="selectedFontSizePt" (ngModelChange)="applyFontSizePt($event)" title="Font Size (pt)">
                   @for (sz of fontSizesPt; track sz) {
-                    <option [ngValue]="sz">{{ sz }} pt</option>
+                    <option [ngValue]="sz">{{ sz }}</option>
                   }
                 </select>
                 <button title="Increase Font Size" (click)="stepFontSize(2)">A▲</button>
                 <button title="Decrease Font Size" (click)="stepFontSize(-2)">A▼</button>
-                <button title="Bold (Ctrl+B)" (click)="execCmd('bold')"><b>B</b></button>
-                <button title="Italic (Ctrl+I)" (click)="execCmd('italic')"><i>I</i></button>
+                <span class="ctrl-sep"></span>
+                <button class="icon-btn" title="Bold (Ctrl+B)" (click)="execCmd('bold')"><b>B</b></button>
+                <button class="icon-btn" title="Italic (Ctrl+I)" (click)="execCmd('italic')"><i>I</i></button>
                 <select (change)="applyUnderlineStyle($any($event.target).value)" title="Underline Style">
-                  <option value="">U (Underline)</option>
-                  <option value="single">Single Underline</option>
-                  <option value="double">Double Underline</option>
-                  <option value="dotted">Dotted Underline</option>
+                  <option value="">U̲</option>
+                  <option value="single">Single U̲</option>
+                  <option value="double">Double U̳</option>
+                  <option value="dotted">Dotted Ṳ</option>
                 </select>
-                <button title="Strikethrough" (click)="execCmd('strikeThrough')"><s>ab</s></button>
-                <button title="Subscript" (click)="execCmd('subscript')">X₂</button>
-                <button title="Superscript" (click)="execCmd('superscript')">X²</button>
+                <button class="icon-btn" title="Strikethrough" (click)="execCmd('strikeThrough')"><s>ab</s></button>
+                <button class="icon-btn" title="Subscript" (click)="execCmd('subscript')">X₂</button>
+                <button class="icon-btn" title="Superscript" (click)="execCmd('superscript')">X²</button>
                 <select (change)="changeSelectedCase($any($event.target).value); $any($event.target).value=''" title="Change Case">
-                  <option value="">Aa Case</option>
+                  <option value="">Aa</option>
                   <option value="upper">UPPERCASE</option>
                   <option value="lower">lowercase</option>
                   <option value="title">Title Case</option>
                   <option value="sentence">Sentence case</option>
                 </select>
                 <label class="color-picker-btn" title="Font Text Color">
-                  A🎨
+                  <span class="color-letter" [style.borderBottomColor]="textColor">A</span>
                   <input type="color" [ngModel]="textColor" (ngModelChange)="applyTextColor($event)" />
                 </label>
                 <label class="color-picker-btn" title="Text Highlight Color">
                   🖍
                   <input type="color" [ngModel]="highlightColor" (ngModelChange)="applyHighlightColor($event)" />
                 </label>
-                <button title="Clear All Formatting" (click)="execCmd('removeFormat')">🧹 Clear</button>
+                <button title="Clear All Formatting" (click)="execCmd('removeFormat')">🧹</button>
               </div>
-              <div class="group-label">Typography &amp; Font</div>
+              <div class="group-label">Font</div>
             </div>
 
             <div class="ribbon-group">
               <div class="group-controls">
-                <button title="Align Left" (click)="execCmd('justifyLeft')">⬅ Left</button>
-                <button title="Align Center" (click)="execCmd('justifyCenter')">↔ Center</button>
-                <button title="Align Right" (click)="execCmd('justifyRight')">➡ Right</button>
-                <button title="Justify" (click)="execCmd('justifyFull')">☰ Justify</button>
+                <button class="icon-btn" title="Align Left" (click)="execCmd('justifyLeft')">⬅</button>
+                <button class="icon-btn" title="Align Center" (click)="execCmd('justifyCenter')">↔</button>
+                <button class="icon-btn" title="Align Right" (click)="execCmd('justifyRight')">➡</button>
+                <button class="icon-btn" title="Justify" (click)="execCmd('justifyFull')">☰</button>
+                <span class="ctrl-sep"></span>
                 <select (change)="applyBulletListStyle($any($event.target).value); $any($event.target).value=''" title="Bulleted List">
-                  <option value="">• Bullets</option>
-                  <option value="disc">• Disc Bullets</option>
-                  <option value="circle">○ Circle Bullets</option>
-                  <option value="square">▪ Square Bullets</option>
+                  <option value="">• List</option>
+                  <option value="disc">• Disc</option>
+                  <option value="circle">○ Circle</option>
+                  <option value="square">▪ Square</option>
                 </select>
                 <select (change)="applyNumberedListStyle($any($event.target).value); $any($event.target).value=''" title="Numbered List">
-                  <option value="">1. Numbering</option>
+                  <option value="">1. List</option>
                   <option value="decimal">1, 2, 3</option>
                   <option value="lower-alpha">a, b, c</option>
                   <option value="lower-roman">i, ii, iii</option>
                 </select>
-                <button title="Decrease Indent" (click)="execCmd('outdent')">⇤ Outdent</button>
-                <button title="Increase Indent" (click)="execCmd('indent')">⇥ Indent</button>
+                <button class="icon-btn" title="Decrease Indent" (click)="execCmd('outdent')">⇤</button>
+                <button class="icon-btn" title="Increase Indent" (click)="execCmd('indent')">⇥</button>
                 <select (change)="applyLineSpacing($any($event.target).value)" title="Line Spacing">
-                  <option value="1.15">↕ Spacing 1.15</option>
-                  <option value="1.0">1.0 Single</option>
-                  <option value="1.5">1.5 Lines</option>
-                  <option value="2.0">2.0 Double</option>
+                  <option value="1.15">↕ 1.15</option>
+                  <option value="1.0">↕ 1.0</option>
+                  <option value="1.5">↕ 1.5</option>
+                  <option value="2.0">↕ 2.0</option>
                 </select>
                 <label class="color-picker-btn" title="Paragraph Shading Fill">
-                  🪣 Shading
+                  🪣
                   <input type="color" value="#eff6ff" (change)="applyParagraphShading($any($event.target).value)" />
                 </label>
                 <button title="Toggle Paragraph Box Border" (click)="toggleParagraphBorder()">▭ Border</button>
               </div>
-              <div class="group-label">Paragraph &amp; Lists</div>
+              <div class="group-label">Paragraph</div>
             </div>
 
             <div class="ribbon-group">
               <div class="group-controls">
+                <button class="btn-accent" (click)="insertTextBox('inline')" title="Insert Editable Word Text Box">
+                  🗔 +Text Box
+                </button>
                 <select (change)="applyQuickHeadingStyle($any($event.target).value); $any($event.target).value=''" title="Quick Styles Gallery">
-                  <option value="">Quick Styles...</option>
-                  <option value="P">Normal Paragraph</option>
-                  <option value="TITLE">Document Title (22pt)</option>
+                  <option value="">Styles Gallery...</option>
+                  <option value="P">Normal</option>
+                  <option value="TITLE">Title (22pt)</option>
                   <option value="SUBTITLE">Subtitle (14pt)</option>
                   <option value="H1">Heading 1</option>
                   <option value="H2">Heading 2</option>
                   <option value="H3">Heading 3</option>
                   <option value="H4">Heading 4</option>
-                  <option value="QUOTE">Block Quote</option>
+                  <option value="QUOTE">Quote</option>
                 </select>
               </div>
-              <div class="group-label">Styles</div>
+              <div class="group-label">Styles &amp; Quick Box</div>
             </div>
           }
 
@@ -222,16 +306,16 @@ import {
             <div class="ribbon-group">
               <div class="group-controls">
                 <label class="inline-lbl">
-                  Rows <input type="number" min="1" max="30" [(ngModel)]="insertTableRows" style="width:46px;" />
+                  Rows <input type="number" min="1" max="30" [(ngModel)]="insertTableRows" style="width:42px;" />
                 </label>
                 <label class="inline-lbl">
-                  Cols <input type="number" min="1" max="15" [(ngModel)]="insertTableCols" style="width:46px;" />
+                  Cols <input type="number" min="1" max="15" [(ngModel)]="insertTableCols" style="width:42px;" />
                 </label>
                 <button class="btn-accent" (click)="insertTable(insertTableRows, insertTableCols, false)">
-                  ⊞ Insert Static Table
+                  ⊞ Static Table
                 </button>
                 <button class="btn-accent" (click)="insertTable(2, 4, true)">
-                  🔁 Insert SQL Data Repeater Table
+                  🔁 SQL Repeater Table
                 </button>
               </div>
               <div class="group-label">Tables</div>
@@ -239,29 +323,51 @@ import {
 
             <div class="ribbon-group">
               <div class="group-controls">
-                <label class="file-upload-btn">
-                  🖼 Upload Image/Logo
-                  <input type="file" accept="image/*" (change)="onUploadLocalImage($event)" hidden />
-                </label>
-                <button (click)="insertImageByUrl()">🌐 Image by URL</button>
-                <button (click)="insertHorizontalDivider()">― Horizontal Rule</button>
-                <button (click)="insertCalloutBox()">💬 Callout Box</button>
-                <button (click)="insertSignatureLine()">✍ Signature Line</button>
-                <button (click)="insertHyperlink()">🔗 Hyperlink</button>
+                <button class="btn-accent" (click)="insertTextBox('inline')" title="Insert Resizable & Rotatable Word Text Box">
+                  🗔 Text Box
+                </button>
+                <button class="btn-accent" (click)="insertTextBox('floating')" title="Insert Floating Draggable & Rotatable Text Box (Move Anywhere)">
+                  📌 Floating Box (Free Move)
+                </button>
+                <button class="btn-accent" (click)="insertStampBadge()" title="Insert Rotatable Stamp / Seal (e.g. APPROVED / ORIGINAL)">
+                  🏷 Rotated Stamp
+                </button>
+                <select (change)="insertShapePreset($any($event.target).value); $any($event.target).value=''" title="Insert Word Shape or Banner">
+                  <option value="">⬛ Insert Shape...</option>
+                  <option value="rectangle">▭ Rectangle Box</option>
+                  <option value="rounded">▱ Rounded Banner Box</option>
+                  <option value="circle">◯ Circle / Oval Badge</option>
+                  <option value="warning">⚠ Warning / Alert Box</option>
+                  <option value="callout">💬 Callout Note Box</option>
+                </select>
               </div>
-              <div class="group-label">Illustrations, Shapes &amp; Links</div>
+              <div class="group-label">Text Boxes, Stamps &amp; Shapes</div>
             </div>
 
             <div class="ribbon-group">
               <div class="group-controls">
-                <button (click)="focusRegion('header')">⬆ Edit Header</button>
-                <button (click)="focusRegion('footer')">⬇ Edit Footer</button>
+                <label class="file-upload-btn">
+                  🖼 Logo / Image
+                  <input type="file" accept="image/*" (change)="onUploadLocalImage($event)" hidden />
+                </label>
+                <button (click)="insertImageByUrl()">🌐 Image URL</button>
+                <button (click)="insertHorizontalDivider()">― Divider</button>
+                <button (click)="insertSignatureLine()">✍ Signature</button>
+                <button (click)="insertHyperlink()">🔗 Link</button>
+              </div>
+              <div class="group-label">Pictures &amp; Lines</div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="group-controls">
+                <button (click)="focusRegion('header')">⬆ Header</button>
+                <button (click)="focusRegion('footer')">⬇ Footer</button>
                 <button (click)="insertSystemToken('PageNumber')"># Page X of Y</button>
-                <button (click)="insertSystemToken('CurrentDate')">📅 Current Date</button>
-                <button (click)="insertSystemToken('CurrentTime')">⏰ Current Time</button>
+                <button (click)="insertSystemToken('CurrentDate')">📅 Date</button>
+                <button (click)="insertSystemToken('CurrentTime')">⏰ Time</button>
                 <button (click)="insertSystemToken('PrintedBy')">👤 Printed By</button>
               </div>
-              <div class="group-label">Header, Footer &amp; System Tokens</div>
+              <div class="group-label">Header, Footer &amp; Tokens</div>
             </div>
 
             <div class="ribbon-group">
@@ -280,28 +386,28 @@ import {
           @if (ribbonTab() === 'table') {
             <div class="ribbon-group">
               <div class="group-controls">
-                <button (click)="tableInsertRow('above')">⬆ Insert Row Above</button>
-                <button (click)="tableInsertRow('below')">⬇ Insert Row Below</button>
-                <button (click)="tableInsertColumn('left')">⬅ Insert Col Left</button>
-                <button (click)="tableInsertColumn('right')">➡ Insert Col Right</button>
-                <button class="btn-danger-lite" (click)="tableDeleteRow()">✖ Delete Row</button>
-                <button class="btn-danger-lite" (click)="tableDeleteColumn()">✖ Delete Col</button>
-                <button class="btn-danger-lite" (click)="tableDeleteTable()">🗑 Delete Table</button>
+                <button (click)="tableInsertRow('above')">⬆ Row Above</button>
+                <button (click)="tableInsertRow('below')">⬇ Row Below</button>
+                <button (click)="tableInsertColumn('left')">⬅ Col Left</button>
+                <button (click)="tableInsertColumn('right')">➡ Col Right</button>
+                <button class="btn-danger-lite" (click)="tableDeleteRow()">✖ Row</button>
+                <button class="btn-danger-lite" (click)="tableDeleteColumn()">✖ Col</button>
+                <button class="btn-danger-lite" (click)="tableDeleteTable()">🗑 Table</button>
               </div>
               <div class="group-label">Rows &amp; Columns</div>
             </div>
 
             <div class="ribbon-group">
               <div class="group-controls">
-                <button (click)="tableMergeWithNextCell()">⊞ Merge Right Cell</button>
+                <button (click)="tableMergeWithNextCell()">⊞ Merge Right</button>
                 <button (click)="tableSplitCurrentCell()">⊟ Split Cell</button>
-                <button (click)="tableSetVerticalAlign('top')">⤒ Align Top</button>
-                <button (click)="tableSetVerticalAlign('middle')">VMiddle</button>
-                <button (click)="tableSetVerticalAlign('bottom')">⤓ Align Bottom</button>
+                <button (click)="tableSetVerticalAlign('top')">⤒ Top</button>
+                <button (click)="tableSetVerticalAlign('middle')">VMid</button>
+                <button (click)="tableSetVerticalAlign('bottom')">⤓ Bottom</button>
                 <select (change)="tableSetCellPadding($any($event.target).value)" title="Cell Padding">
-                  <option value="8px">Padding: Normal (8px)</option>
-                  <option value="4px">Compact (4px)</option>
-                  <option value="12px">Generous (12px)</option>
+                  <option value="8px">Pad: Normal</option>
+                  <option value="4px">Pad: Compact</option>
+                  <option value="12px">Pad: Wide</option>
                 </select>
               </div>
               <div class="group-label">Merge &amp; Alignment</div>
@@ -310,14 +416,14 @@ import {
             <div class="ribbon-group">
               <div class="group-controls">
                 <label class="color-picker-btn">
-                  🎨 Cell Shading
+                  🎨 Shading
                   <input type="color" [(ngModel)]="tableCellShadingColor" (ngModelChange)="tableApplyCellShading($event)" />
                 </label>
                 <select [(ngModel)]="tableBorderStyle" (ngModelChange)="tableApplyBorders()">
-                  <option value="solid">Solid Border</option>
-                  <option value="dashed">Dashed Border</option>
-                  <option value="dotted">Dotted Border</option>
-                  <option value="double">Double Border</option>
+                  <option value="solid">Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="dotted">Dotted</option>
+                  <option value="double">Double</option>
                   <option value="none">No Border</option>
                 </select>
                 <select [(ngModel)]="tableBorderWidthPx" (ngModelChange)="tableApplyBorders()">
@@ -326,7 +432,7 @@ import {
                   <option [ngValue]="3">3 px</option>
                 </select>
                 <label class="color-picker-btn">
-                  Border Color
+                  Border
                   <input type="color" [(ngModel)]="tableBorderColor" (ngModelChange)="tableApplyBorders()" />
                 </label>
               </div>
@@ -336,16 +442,16 @@ import {
             <div class="ribbon-group">
               <div class="group-controls">
                 <button class="btn-accent" (click)="tableToggleHeaderRepeat()">
-                  📌 Toggle Header Row Repeat
+                  📌 Repeat Header
                 </button>
                 <button class="btn-accent" (click)="tableToggleRepeaterRow()">
-                  🔁 Toggle SQL Repeating Data Row
+                  🔁 SQL Repeater Row
                 </button>
                 <button (click)="tableAppendAggregateFooterRow()">
-                  ∑ Add Summary Aggregate Footer Row
+                  ∑ Summary Footer Row
                 </button>
               </div>
-              <div class="group-label">SQL Data Binding &amp; Pagination</div>
+              <div class="group-label">SQL Data Binding</div>
             </div>
           }
 
@@ -359,14 +465,14 @@ import {
                   <option value="Legal">Legal (216 × 356 mm)</option>
                   <option value="A3">A3 (297 × 420 mm)</option>
                   <option value="A5">A5 (148 × 210 mm)</option>
-                  <option value="Custom">Custom Dimensions</option>
+                  <option value="Custom">Custom Size</option>
                 </select>
                 @if (pageSetup.pageSize === 'Custom') {
                   <label class="inline-lbl">
-                    W(mm) <input type="number" [(ngModel)]="pageSetup.widthMm" style="width:58px;" />
+                    W <input type="number" [(ngModel)]="pageSetup.widthMm" style="width:50px;" />
                   </label>
                   <label class="inline-lbl">
-                    H(mm) <input type="number" [(ngModel)]="pageSetup.heightMm" style="width:58px;" />
+                    H <input type="number" [(ngModel)]="pageSetup.heightMm" style="width:50px;" />
                   </label>
                 }
                 <select [(ngModel)]="pageSetup.orientation" title="Orientation">
@@ -376,17 +482,17 @@ import {
                 <select (change)="applyMarginPreset($any($event.target).value)" title="Margins Preset">
                   <option value="normal">Margins: Normal (20mm)</option>
                   <option value="narrow">Narrow (12.7mm)</option>
-                  <option value="moderate">Moderate (19mm/25mm)</option>
-                  <option value="wide">Wide (25.4mm/50.8mm)</option>
+                  <option value="moderate">Moderate (19/25mm)</option>
+                  <option value="wide">Wide (25/50mm)</option>
                 </select>
                 <label class="inline-lbl" title="Top/Bottom/Left/Right Margins in mm">
-                  T <input type="number" [(ngModel)]="pageSetup.marginTopMm" style="width:45px;" />
-                  B <input type="number" [(ngModel)]="pageSetup.marginBottomMm" style="width:45px;" />
-                  L <input type="number" [(ngModel)]="pageSetup.marginLeftMm" style="width:45px;" />
-                  R <input type="number" [(ngModel)]="pageSetup.marginRightMm" style="width:45px;" />
+                  T <input type="number" [(ngModel)]="pageSetup.marginTopMm" style="width:42px;" />
+                  B <input type="number" [(ngModel)]="pageSetup.marginBottomMm" style="width:42px;" />
+                  L <input type="number" [(ngModel)]="pageSetup.marginLeftMm" style="width:42px;" />
+                  R <input type="number" [(ngModel)]="pageSetup.marginRightMm" style="width:42px;" />
                 </label>
               </div>
-              <div class="group-label">Page Size, Orientation &amp; Margins (mm)</div>
+              <div class="group-label">Page Setup (mm)</div>
             </div>
 
             <div class="ribbon-group">
@@ -403,26 +509,26 @@ import {
             <div class="ribbon-group">
               <div class="group-controls">
                 <label class="inline-lbl">
-                  <input type="checkbox" [(ngModel)]="watermark.enabled" /> Enable Watermark
+                  <input type="checkbox" [(ngModel)]="watermark.enabled" /> Watermark
                 </label>
                 <select [(ngModel)]="watermark.type">
-                  <option value="Text">Text Watermark</option>
-                  <option value="Image">Image URL Watermark</option>
+                  <option value="Text">Text</option>
+                  <option value="Image">Image URL</option>
                 </select>
                 @if (watermark.type === 'Text') {
                   <input
                     type="text"
                     [(ngModel)]="watermark.text"
-                    placeholder="DRAFT / CONFIDENTIAL"
-                    style="width:130px;"
+                    placeholder="CONFIDENTIAL"
+                    style="width:115px;"
                   />
                   <input type="color" [(ngModel)]="watermark.color" title="Watermark Color" />
                 } @else {
                   <input
                     type="text"
                     [(ngModel)]="watermark.imageUrl"
-                    placeholder="Logo Image URL..."
-                    style="width:160px;"
+                    placeholder="Logo URL..."
+                    style="width:140px;"
                   />
                 }
                 <select [(ngModel)]="watermark.rotationDeg" title="Watermark Orientation">
@@ -430,7 +536,7 @@ import {
                   <option [ngValue]="0">Horizontal (0°)</option>
                 </select>
               </div>
-              <div class="group-label">Page Watermark</div>
+              <div class="group-label">Watermark</div>
             </div>
           }
 
@@ -444,14 +550,15 @@ import {
                     type="range"
                     min="50"
                     max="200"
-                    step="10"
+                    step="5"
                     [ngModel]="zoomPercent()"
                     (ngModelChange)="zoomPercent.set($event)"
                   />
                 </label>
+                <button (click)="zoomPercent.set(75)">Fit Page (75%)</button>
+                <button (click)="zoomPercent.set(85)">85%</button>
                 <button (click)="zoomPercent.set(100)">100%</button>
-                <button (click)="zoomPercent.set(80)">Fit Page</button>
-                <button (click)="zoomPercent.set(120)">Fit Width</button>
+                <button (click)="zoomPercent.set(115)">Fit Width</button>
               </div>
               <div class="group-label">Zoom</div>
             </div>
@@ -460,28 +567,146 @@ import {
               <div class="group-controls">
                 <label class="inline-lbl">
                   <input type="checkbox" [ngModel]="showRulers()" (ngModelChange)="showRulers.set($event)" />
-                  Show Rulers (mm)
+                  Rulers (mm)
                 </label>
                 <label class="inline-lbl">
                   <input type="checkbox" [(ngModel)]="showGridlines" />
-                  Show Table Gridlines
+                  Table Gridlines
                 </label>
                 <label class="inline-lbl">
-                  First-Line Indent (mm):
+                  Indent (mm):
                   <input
                     type="number"
                     min="0"
                     max="60"
                     [ngModel]="firstLineIndentMm()"
                     (ngModelChange)="applyFirstLineIndent($event)"
-                    style="width:52px;"
+                    style="width:46px;"
                   />
                 </label>
               </div>
-              <div class="group-label">Rulers &amp; Gridlines</div>
+              <div class="group-label">Show</div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="group-controls">
+                <button class="btn-accent" (click)="isFullScreen.set(!isFullScreen())">
+                  {{ isFullScreen() ? '🗗 Reduce / Exit Full Screen' : '⛶ Full Screen Mode' }}
+                </button>
+                <button (click)="isRightSidebarOpen.set(!isRightSidebarOpen())">
+                  {{ isRightSidebarOpen() ? '◨ Hide Fields Panel' : '◧ Show Fields Panel' }}
+                </button>
+              </div>
+              <div class="group-label">Window</div>
+            </div>
+          }
+
+          <!-- TAB 6: SHAPE & OBJECT FORMAT (Rotate, Resize, Float/Move, Fill & Border) -->
+          @if (ribbonTab() === 'object') {
+            <div class="ribbon-group">
+              <div class="group-controls">
+                <button class="btn-accent" (click)="insertTextBox('inline')">🗔 +Text Box</button>
+                <button class="btn-accent" (click)="insertTextBox('floating')">📌 +Floating Box</button>
+                <button class="btn-accent" (click)="insertStampBadge()">🏷 +Stamp</button>
+              </div>
+              <div class="group-label">Insert Object</div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="group-controls">
+                <button (click)="rotateSelectedObjectBy(-90)" title="Rotate Left 90°">↺ -90°</button>
+                <button (click)="rotateSelectedObjectBy(-15)" title="Rotate Left 15°">↺ -15°</button>
+                <button class="btn-accent" (click)="setSelectedObjectRotation(0)" title="Reset Rotation to 0°">0° Reset</button>
+                <button (click)="rotateSelectedObjectBy(15)" title="Rotate Right 15°">↻ +15°</button>
+                <button (click)="rotateSelectedObjectBy(90)" title="Rotate Right 90°">↻ +90°</button>
+                <button (click)="rotateSelectedObjectBy(180)" title="Flip 180°">⇅ 180°</button>
+                <label class="inline-lbl">
+                  Angle:
+                  <input
+                    type="range"
+                    min="-180"
+                    max="180"
+                    step="5"
+                    [ngModel]="objRotationDeg()"
+                    (ngModelChange)="setSelectedObjectRotation($event)"
+                    style="width:80px;"
+                  />
+                  <input
+                    type="number"
+                    min="-360"
+                    max="360"
+                    [ngModel]="objRotationDeg()"
+                    (ngModelChange)="setSelectedObjectRotation($event)"
+                    style="width:52px;"
+                  />°
+                </label>
+              </div>
+              <div class="group-label">Rotate Object / Text Box / Image ({{ objRotationDeg() }}°)</div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="group-controls">
+                <label class="inline-lbl">
+                  W(px)
+                  <input
+                    type="number"
+                    min="40"
+                    max="800"
+                    step="10"
+                    [ngModel]="objWidthPx()"
+                    (ngModelChange)="setSelectedObjectSize($event, objHeightPx())"
+                    style="width:54px;"
+                  />
+                </label>
+                <label class="inline-lbl">
+                  H(px)
+                  <input
+                    type="number"
+                    min="24"
+                    max="800"
+                    step="10"
+                    [ngModel]="objHeightPx()"
+                    (ngModelChange)="setSelectedObjectSize(objWidthPx(), $event)"
+                    style="width:54px;"
+                  />
+                </label>
+                <button (click)="toggleSelectedObjectFloating()" [class.active-tool]="objIsFloating()" title="Toggle Free Floating Position vs Inline">
+                  {{ objIsFloating() ? '📌 Floating (Drag Handle)' : '📄 Inline' }}
+                </button>
+                <button (click)="nudgeSelectedObject(-10, 0)" title="Move Left">⬅</button>
+                <button (click)="nudgeSelectedObject(0, -10)" title="Move Up">⬆</button>
+                <button (click)="nudgeSelectedObject(0, 10)" title="Move Down">⬇</button>
+                <button (click)="nudgeSelectedObject(10, 0)" title="Move Right">➡</button>
+              </div>
+              <div class="group-label">Size &amp; Position (Move)</div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="group-controls">
+                <label class="color-picker-btn" title="Shape / Box Fill Color">
+                  🪣 Fill
+                  <input type="color" [ngModel]="objBgColor()" (ngModelChange)="setSelectedObjectFill($event)" />
+                </label>
+                <label class="color-picker-btn" title="Shape / Box Border Color">
+                  ▭ Border
+                  <input type="color" [ngModel]="objBorderColor()" (ngModelChange)="setSelectedObjectBorderColor($event)" />
+                </label>
+                <select (change)="setSelectedObjectBorderStyle($any($event.target).value)" title="Border Style">
+                  <option value="1px solid">Solid</option>
+                  <option value="2px solid">Thick Solid</option>
+                  <option value="2px dashed">Dashed</option>
+                  <option value="3px double">Double</option>
+                  <option value="none">No Border</option>
+                </select>
+                <button class="btn-danger-lite" (click)="deleteSelectedObject()" title="Delete Selected Text Box / Shape / Image">
+                  🗑 Delete
+                </button>
+              </div>
+              <div class="group-label">Shape Styles</div>
             </div>
           }
         </div>
+        }
       </div>
 
       <!-- Optional Find & Replace Bar -->
@@ -496,110 +721,127 @@ import {
       }
 
       <!-- Main Split Workspace: Paginated Canvas (Left/Center) + Governed Field & Filter Sidebar (Right) -->
-      <div class="workspace-split">
+      <div class="workspace-split" [class.sidebar-collapsed]="!isRightSidebarOpen()">
         <!-- Center Canvas Area with Horizontal & Vertical Rulers -->
-        <div class="canvas-viewport">
-          @if (showRulers()) {
-            <div class="horizontal-ruler" [style.width.mm]="effectivePageWidthMm()">
-              @for (cm of horizontalRulerTicks(); track cm) {
-                <span class="ruler-tick" [style.left.mm]="cm * 10">{{ cm }}</span>
-              }
-              <div
-                class="indent-marker"
-                [style.left.mm]="pageSetup.marginLeftMm + firstLineIndentMm()"
-                title="First-line Indent Marker"
-              >▼</div>
-            </div>
-          }
-
-          <div class="canvas-row-wrap">
+        <div
+          class="canvas-viewport"
+          (mousemove)="onCanvasMouseMove($event)"
+          (mouseup)="onCanvasMouseUp()"
+        >
+          <div class="canvas-zoom-stage" [style.zoom]="zoomPercent() + '%'">
             @if (showRulers()) {
-              <div class="vertical-ruler" [style.minHeight.mm]="effectivePageHeightMm()">
-                @for (cm of verticalRulerTicks(); track cm) {
-                  <span class="v-ruler-tick" [style.top.mm]="cm * 10">{{ cm }}</span>
+              <div class="horizontal-ruler" [style.width.mm]="effectivePageWidthMm()">
+                @for (cm of horizontalRulerTicks(); track cm) {
+                  <span class="ruler-tick" [style.left.mm]="cm * 10">{{ cm }}</span>
                 }
+                <div
+                  class="indent-marker"
+                  [style.left.mm]="pageSetup.marginLeftMm + firstLineIndentMm()"
+                  title="First-line Indent Marker"
+                >▼</div>
               </div>
             }
 
-            <!-- Paginated Physical Sheet -->
-            <div
-              class="page-sheet"
-              [class.show-gridlines]="showGridlines"
-              [style.width.mm]="effectivePageWidthMm()"
-              [style.minHeight.mm]="effectivePageHeightMm()"
-              [style.paddingTop.mm]="pageSetup.marginTopMm"
-              [style.paddingBottom.mm]="pageSetup.marginBottomMm"
-              [style.paddingLeft.mm]="pageSetup.marginLeftMm"
-              [style.paddingRight.mm]="pageSetup.marginRightMm"
-              [style.transform]="'scale(' + zoomPercent() / 100 + ')'"
-              (dragover)="onCanvasDragOver($event)"
-              (drop)="onCanvasDrop($event)"
-            >
-              <!-- Watermark Layer -->
-              @if (watermark.enabled) {
-                <div
-                  class="watermark-layer"
-                  [style.opacity]="watermark.opacity"
-                >
-                  @if (watermark.type === 'Image' && watermark.imageUrl) {
-                    <img
-                      [src]="watermark.imageUrl"
-                      [style.transform]="'rotate(' + watermark.rotationDeg + 'deg)'"
-                      alt="Watermark"
-                    />
-                  } @else {
-                    <span
-                      [style.color]="watermark.color"
-                      [style.fontSize.pt]="watermark.fontSizePt"
-                      [style.transform]="'rotate(' + watermark.rotationDeg + 'deg)'"
-                    >
-                      {{ watermark.text }}
-                    </span>
+            <div class="canvas-row-wrap">
+              @if (showRulers()) {
+                <div class="vertical-ruler" [style.minHeight.mm]="effectivePageHeightMm()">
+                  @for (cm of verticalRulerTicks(); track cm) {
+                    <span class="v-ruler-tick" [style.top.mm]="cm * 10">{{ cm }}</span>
                   }
                 </div>
               }
 
-              <!-- Repeating Page Header Region -->
-              <div class="sheet-region header-region">
-                <div class="region-badge">Repeating Header</div>
-                <div
-                  #headerEditor
-                  class="editable-surface header-surface"
-                  contenteditable="true"
-                  (focus)="activeEditorRegion.set('header')"
-                  (keyup)="syncCanvasState()"
-                  (mouseup)="onEditorMouseUp()"
-                  (contextmenu)="onCanvasRightClick($event)"
-                ></div>
-              </div>
+              <!-- Paginated Physical Sheet (Microsoft Word A4 Paper) -->
+              <div
+                class="page-sheet"
+                [class.show-gridlines]="showGridlines"
+                [style.width.mm]="effectivePageWidthMm()"
+                [style.minHeight.mm]="effectivePageHeightMm()"
+                [style.paddingTop.mm]="pageSetup.marginTopMm"
+                [style.paddingBottom.mm]="pageSetup.marginBottomMm"
+                [style.paddingLeft.mm]="pageSetup.marginLeftMm"
+                [style.paddingRight.mm]="pageSetup.marginRightMm"
+                (dragover)="onCanvasDragOver($event)"
+                (drop)="onCanvasDrop($event)"
+              >
+                <!-- Subtle MS Word Margin Crop Marks -->
+                <span class="crop-mark crop-tl" [style.top.mm]="pageSetup.marginTopMm" [style.left.mm]="pageSetup.marginLeftMm"></span>
+                <span class="crop-mark crop-tr" [style.top.mm]="pageSetup.marginTopMm" [style.right.mm]="pageSetup.marginRightMm"></span>
+                <span class="crop-mark crop-bl" [style.bottom.mm]="pageSetup.marginBottomMm" [style.left.mm]="pageSetup.marginLeftMm"></span>
+                <span class="crop-mark crop-br" [style.bottom.mm]="pageSetup.marginBottomMm" [style.right.mm]="pageSetup.marginRightMm"></span>
 
-              <!-- Main Multi-Column Rich Text Body Region -->
-              <div class="sheet-region body-region">
-                <div
-                  #bodyEditor
-                  class="editable-surface body-surface"
-                  contenteditable="true"
-                  [style.columnCount]="pageSetup.columns"
-                  [style.columnGap.mm]="8"
-                  (focus)="activeEditorRegion.set('body')"
-                  (keyup)="syncCanvasState()"
-                  (mouseup)="onEditorMouseUp()"
-                  (contextmenu)="onCanvasRightClick($event)"
-                ></div>
-              </div>
+                <!-- Watermark Layer -->
+                @if (watermark.enabled) {
+                  <div
+                    class="watermark-layer"
+                    [style.opacity]="watermark.opacity"
+                  >
+                    @if (watermark.type === 'Image' && watermark.imageUrl) {
+                      <img
+                        [src]="watermark.imageUrl"
+                        [style.transform]="'rotate(' + watermark.rotationDeg + 'deg)'"
+                        alt="Watermark"
+                      />
+                    } @else {
+                      <span
+                        [style.color]="watermark.color"
+                        [style.fontSize.pt]="watermark.fontSizePt"
+                        [style.transform]="'rotate(' + watermark.rotationDeg + 'deg)'"
+                      >
+                        {{ watermark.text }}
+                      </span>
+                    }
+                  </div>
+                }
 
-              <!-- Repeating Page Footer Region -->
-              <div class="sheet-region footer-region">
-                <div class="region-badge">Repeating Footer</div>
-                <div
-                  #footerEditor
-                  class="editable-surface footer-surface"
-                  contenteditable="true"
-                  (focus)="activeEditorRegion.set('footer')"
-                  (keyup)="syncCanvasState()"
-                  (mouseup)="onEditorMouseUp()"
-                  (contextmenu)="onCanvasRightClick($event)"
-                ></div>
+                <!-- Repeating Page Header Region -->
+                <div class="sheet-region header-region" [class.region-focused]="activeEditorRegion() === 'header'">
+                  <div class="region-badge">Header</div>
+                  <div
+                    #headerEditor
+                    class="editable-surface header-surface"
+                    contenteditable="true"
+                    (focus)="activeEditorRegion.set('header')"
+                    (mousedown)="onEditorMouseDown($event)"
+                    (keyup)="onEditorKeyUp()"
+                    (mouseup)="onEditorMouseUp()"
+                    (paste)="onEditorPaste($event)"
+                    (contextmenu)="onCanvasRightClick($event)"
+                  ></div>
+                </div>
+
+                <!-- Main Multi-Column Rich Text Body Region -->
+                <div class="sheet-region body-region">
+                  <div
+                    #bodyEditor
+                    class="editable-surface body-surface"
+                    contenteditable="true"
+                    [style.columnCount]="pageSetup.columns"
+                    [style.columnGap.mm]="8"
+                    (focus)="activeEditorRegion.set('body')"
+                    (mousedown)="onEditorMouseDown($event)"
+                    (keyup)="onEditorKeyUp()"
+                    (mouseup)="onEditorMouseUp()"
+                    (paste)="onEditorPaste($event)"
+                    (contextmenu)="onCanvasRightClick($event)"
+                  ></div>
+                </div>
+
+                <!-- Repeating Page Footer Region -->
+                <div class="sheet-region footer-region" [class.region-focused]="activeEditorRegion() === 'footer'">
+                  <div class="region-badge">Footer</div>
+                  <div
+                    #footerEditor
+                    class="editable-surface footer-surface"
+                    contenteditable="true"
+                    (focus)="activeEditorRegion.set('footer')"
+                    (mousedown)="onEditorMouseDown($event)"
+                    (keyup)="onEditorKeyUp()"
+                    (mouseup)="onEditorMouseUp()"
+                    (paste)="onEditorPaste($event)"
+                    (contextmenu)="onCanvasRightClick($event)"
+                  ></div>
+                </div>
               </div>
             </div>
           </div>
@@ -617,6 +859,7 @@ import {
         </div>
 
         <!-- Right Sidebar: FK-Governed Database Fields & Runtime Filter Builder -->
+        @if (isRightSidebarOpen()) {
         <aside class="right-sidebar">
           <div class="sidebar-tabs">
             <button
@@ -652,7 +895,7 @@ import {
               } @else {
                 <div class="zero-state-info">
                   <strong>🟢 Zero-State (All Published Fields Unlocked)</strong>
-                  <span>Drag or click any field to set the Anchor Table and activate FK graph reachability.</span>
+                  <span>Drag, Click, or click <b>📋 Copy</b> &amp; Paste (<code>Ctrl+V</code>) or type <code>{{ '{{Table.Alias}}' }}</code> anywhere!</span>
                 </div>
               }
             </div>
@@ -660,7 +903,7 @@ import {
             <div class="field-search-box">
               <input
                 type="text"
-                placeholder="Search published fields or tables..."
+                placeholder="Search published fields, aliases, or tables..."
                 [ngModel]="fieldSearch()"
                 (ngModelChange)="fieldSearch.set($event)"
               />
@@ -696,17 +939,24 @@ import {
                         class="field-pill"
                         [class.disabled-pill]="!grp.isReachable"
                         [attr.draggable]="grp.isReachable ? 'true' : 'false'"
-                        [title]="grp.isReachable ? 'Drag onto canvas or click to insert ' + fld.displayName : grp.lockReason"
+                        [title]="grp.isReachable ? 'Drag onto canvas, Click to insert, or click Copy to paste anywhere: ' + fld.displayName : grp.lockReason"
                         (dragstart)="onFieldDragStart($event, fld, grp.isReachable)"
                         (click)="onFieldClickInsert(fld, grp.isReachable)"
                       >
                         <div class="fld-main">
                           <span class="fld-alias">{{ fld.displayName }}</span>
-                          <code class="fld-col">{{ fld.columnName }}</code>
+                          <code class="fld-col">{{ '{{' + fld.tableName + '.' + fld.displayName + '}}' }}</code>
                         </div>
                         <div class="fld-right">
                           <span class="fld-type">{{ fld.dataType }}</span>
                           @if (grp.isReachable) {
+                            <button
+                              class="btn-copy-tag-mini"
+                              [title]="'Copy {{' + fld.tableName + '.' + fld.displayName + '}} to clipboard — Paste (Ctrl+V) anywhere!'"
+                              (click)="copyFieldMergeTag(fld, grp.isReachable); $event.stopPropagation()"
+                            >
+                              📋 Copy
+                            </button>
                             <button
                               class="btn-add-filter-mini"
                               title="Add as Runtime Filter"
@@ -804,7 +1054,44 @@ import {
             </div>
           }
         </aside>
+        }
       </div>
+
+      <!-- Microsoft Word Bottom Status Bar (Hidden in Full Screen Mode so ONLY Ribbon + Page + Fields show) -->
+      @if (!isFullScreen()) {
+        <div class="word-status-bar">
+          <div class="status-left">
+            <span class="status-item">📄 Page 1 of 1</span>
+            <span class="status-sep">|</span>
+            <span class="status-item">{{ pageSetup.pageSize }} {{ pageSetup.orientation }} ({{ effectivePageWidthMm() }} × {{ effectivePageHeightMm() }} mm)</span>
+            <span class="status-sep">|</span>
+            <span class="status-item">⚓ Anchor: <strong>{{ anchorTable() || 'None (Zero-State)' }}</strong></span>
+            <span class="status-sep">|</span>
+            <span class="status-item">🏷 {{ selectedFields().length }} Bound Fields · {{ runtimeFilters().length }} Filters</span>
+          </div>
+          <div class="status-right">
+            <button class="status-mode-btn" (click)="isRightSidebarOpen.set(!isRightSidebarOpen())">
+              {{ isRightSidebarOpen() ? '◨ Hide Sidebar' : '◧ Show Sidebar' }}
+            </button>
+            <button class="status-mode-btn" (click)="toggleFullScreen()">
+              {{ isFullScreen() ? '🗗 Exit Full Screen' : '⛶ Full Screen' }}
+            </button>
+            <span class="status-sep">|</span>
+            <button class="status-zoom-step" (click)="zoomPercent.set(Math.max(40, zoomPercent() - 10))" title="Zoom Out">−</button>
+            <input
+              type="range"
+              class="status-zoom-slider"
+              min="40"
+              max="220"
+              step="5"
+              [ngModel]="zoomPercent()"
+              (ngModelChange)="zoomPercent.set($event)"
+            />
+            <button class="status-zoom-step" (click)="zoomPercent.set(Math.min(220, zoomPercent() + 10))" title="Zoom In">+</button>
+            <span class="status-zoom-pct" (click)="zoomPercent.set(80)" title="Click to reset zoom to 80%">{{ zoomPercent() }}%</span>
+          </div>
+        </div>
+      }
 
       <!-- Role-Playing Foreign Key Disambiguation Modal (D-03 / BIND-02) -->
       @if (pendingRoleDrop(); as pending) {
@@ -903,167 +1190,344 @@ import {
       height: 100%;
       min-height: 0;
       overflow: hidden;
-      background: #e2e8f0;
+      background: #f3f2f1;
       user-select: none;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .designer-root.fullscreen-mode {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 2500;
     }
     .template-bar {
       flex: 0 0 auto;
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 16px;
+      padding: 5px 12px;
+      background: #185abd;
+      color: #ffffff;
+      gap: 8px;
+    }
+    .word-app-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
       background: #ffffff;
-      border-bottom: 1px solid #cbd5e1;
-      gap: 12px;
+      color: #185abd;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: -0.5px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
     }
     .template-meta {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 8px;
-      flex: 1;
+      gap: 6px;
+      flex: 1 1 auto;
     }
     .template-picker, .doc-mode-select {
-      padding: 6px 10px;
-      border: 1px solid #cbd5e1;
-      border-radius: 5px;
-      font-size: 12.5px;
-      background: #f8fafc;
+      padding: 4px 8px;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 4px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.14);
+      color: #ffffff;
+      max-width: 235px;
+      outline: none;
+    }
+    .template-picker option, .doc-mode-select option {
+      background: #ffffff;
+      color: #0f172a;
     }
     .template-name-input {
-      padding: 6px 12px;
-      border: 1px solid #94a3b8;
-      border-radius: 5px;
-      font-size: 13px;
+      padding: 4px 10px;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 4px;
+      font-size: 12.5px;
       font-weight: 600;
-      min-width: 260px;
+      min-width: 175px;
+      background: rgba(255,255,255,0.95);
+      color: #0f172a;
     }
     .template-actions {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
     .save-toast {
       background: #dcfce7;
       color: #166534;
+      padding: 3px 9px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .btn-window-mode {
+      background: rgba(255,255,255,0.14);
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,0.3);
       padding: 4px 10px;
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-window-mode:hover {
+      background: rgba(255,255,255,0.24);
+    }
+    .btn-fullscreen-toggle {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fcd34d;
+      padding: 4px 11px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-fullscreen-toggle.active-fs {
+      background: #fee2e2;
+      color: #991b1b;
+      border-color: #fca5a5;
     }
     .btn-sql-toggle {
       background: #0f172a;
       color: #38bdf8;
       border: 1px solid #334155;
-      padding: 6px 12px;
-      border-radius: 5px;
-      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11.5px;
       font-weight: 600;
       cursor: pointer;
     }
     .btn-save {
-      background: #2563eb;
-      color: #fff;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 5px;
-      font-size: 12.5px;
-      font-weight: 600;
+      background: #ffffff;
+      color: #185abd;
+      border: 1px solid #ffffff;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
       cursor: pointer;
     }
     .btn-run {
-      background: #059669;
-      color: #fff;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 5px;
-      font-size: 12.5px;
-      font-weight: 600;
+      background: #107c41;
+      color: #ffffff;
+      border: 1px solid #a7f3d0;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
       cursor: pointer;
     }
     .word-ribbon {
       flex: 0 0 auto;
-      background: #f8fafc;
-      border-bottom: 1px solid #cbd5e1;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      background: #f3f2f1;
+      padding: 0 10px 6px;
+      border-bottom: 1px solid #d2d0ce;
+    }
+    .ribbon-tabs-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 4px 0;
     }
     .ribbon-tabs {
       display: flex;
       gap: 2px;
-      padding: 4px 14px 0;
-      background: #f1f5f9;
-      border-bottom: 1px solid #cbd5e1;
+      align-items: center;
     }
     .ribbon-tabs button {
-      border: 1px solid transparent;
-      border-bottom: none;
+      border: none;
       background: transparent;
-      padding: 6px 16px;
+      padding: 6px 14px;
       font-size: 12.5px;
-      font-weight: 600;
-      color: #475569;
+      font-weight: 500;
+      color: #323130;
       cursor: pointer;
-      border-radius: 5px 5px 0 0;
+      border-radius: 4px 4px 0 0;
+      position: relative;
+    }
+    .ribbon-tabs button:hover {
+      background: #edebe9;
     }
     .ribbon-tabs button.active {
-      background: #ffffff;
-      color: #1e3a8a;
-      border-color: #cbd5e1;
+      color: #185abd;
+      font-weight: 700;
+    }
+    .ribbon-tabs button.active::after {
+      content: '';
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 1px;
+      height: 3px;
+      border-radius: 2px;
+      background: #185abd;
     }
     .ribbon-tabs button.contextual-tab {
-      color: #b45309;
+      color: #986f0b;
+      background: #fff4ce;
+      font-weight: 600;
+    }
+    .ribbon-right-quick {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .quick-zoom-btn, .btn-collapse-ribbon {
+      border: 1px solid #d2d0ce;
+      background: #ffffff;
+      color: #323130;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .quick-zoom-btn:hover, .btn-collapse-ribbon:hover {
+      background: #edebe9;
+    }
+    .quick-save-btn {
+      border: 1px solid #185abd;
+      background: #185abd;
+      color: #ffffff;
+      padding: 2px 9px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .quick-run-btn {
+      border: 1px solid #107c41;
+      background: #107c41;
+      color: #ffffff;
+      padding: 2px 9px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .quick-fs-btn {
+      border: 1px solid #f59e0b;
       background: #fef3c7;
+      color: #92400e;
+      padding: 2px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .quick-fs-btn.active-fs {
+      border-color: #ef4444;
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .quick-zoom-lbl {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #185abd;
+      min-width: 36px;
+      text-align: center;
+      cursor: pointer;
     }
     .ribbon-body {
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      padding: 8px 14px;
-      background: #ffffff;
-      min-height: 66px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 8px;
+      padding: 6px 12px 4px;
+      background: #fbfbfb;
+      border: 1px solid #e1dfdd;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      min-height: 58px;
       align-items: stretch;
     }
     .ribbon-group {
+      flex: 0 0 auto;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       padding-right: 10px;
-      border-right: 1px solid #e2e8f0;
+      border-right: 1px solid #e1dfdd;
+    }
+    .ribbon-group:last-child {
+      border-right: none;
     }
     .group-controls {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
+    }
+    .ctrl-sep {
+      width: 1px;
+      height: 18px;
+      background: #e1dfdd;
+      margin: 0 2px;
     }
     .group-controls button, .group-controls select, .file-upload-btn, .color-picker-btn {
-      padding: 4px 8px;
-      font-size: 12px;
-      border: 1px solid #cbd5e1;
+      height: 26px;
+      padding: 0 7px;
+      font-size: 11.5px;
+      border: 1px solid transparent;
       border-radius: 4px;
-      background: #f8fafc;
-      color: #1e293b;
+      background: transparent;
+      color: #201f1e;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
+      white-space: nowrap;
     }
-    .group-controls button:hover, .file-upload-btn:hover {
-      background: #e2e8f0;
+    .group-controls select {
+      border-color: #d2d0ce;
+      background: #ffffff;
+    }
+    .font-family-select {
+      width: 115px;
+    }
+    .font-size-select {
+      width: 52px;
+    }
+    .icon-btn {
+      min-width: 26px;
+      justify-content: center;
+    }
+    .group-controls button:hover, .file-upload-btn:hover, .color-picker-btn:hover {
+      background: #edebe9;
+      border-color: #c8c6c4;
     }
     .group-controls button.active-tool, .group-controls button.btn-accent {
-      background: #dbeafe;
-      border-color: #60a5fa;
-      color: #1e3a8a;
+      background: #eff6fc;
+      border-color: #185abd;
+      color: #185abd;
       font-weight: 600;
     }
     .btn-danger-lite {
-      background: #fee2e2 !important;
-      color: #991b1b !important;
-      border-color: #fca5a5 !important;
+      background: #fde7e9 !important;
+      color: #a4262c !important;
+      border-color: #f1707b !important;
+    }
+    .color-letter {
+      font-weight: 800;
+      border-bottom: 3px solid #0f172a;
+      line-height: 1;
+      padding-bottom: 1px;
     }
     .color-picker-btn input[type="color"] {
-      width: 18px;
-      height: 18px;
+      width: 14px;
+      height: 14px;
       border: none;
       padding: 0;
       background: transparent;
@@ -1072,36 +1536,44 @@ import {
     .inline-lbl {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      font-size: 11.5px;
+      gap: 3px;
+      font-size: 11px;
       font-weight: 600;
-      color: #334155;
+      color: #323130;
+      white-space: nowrap;
+    }
+    .inline-lbl input[type="number"], .inline-lbl input[type="text"] {
+      height: 24px;
+      padding: 0 4px;
+      border: 1px solid #c8c6c4;
+      border-radius: 3px;
+      font-size: 11px;
     }
     .sym-btn {
       font-weight: 700;
-      min-width: 28px;
+      min-width: 24px;
       justify-content: center;
     }
     .group-label {
-      font-size: 10px;
+      font-size: 9.5px;
       text-align: center;
-      color: #64748b;
-      margin-top: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
+      color: #605e5c;
+      margin-top: 3px;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
     }
     .find-replace-bar {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 16px;
-      background: #fef9c3;
-      border-bottom: 1px solid #fde047;
-      font-size: 12.5px;
+      padding: 5px 14px;
+      background: #fff4ce;
+      border-bottom: 1px solid #fed9cc;
+      font-size: 12px;
     }
     .find-replace-bar input {
-      padding: 4px 8px;
-      border: 1px solid #cbd5e1;
+      padding: 3px 8px;
+      border: 1px solid #c8c6c4;
       border-radius: 4px;
     }
     .workspace-split {
@@ -1110,8 +1582,11 @@ import {
       min-width: 0;
       height: 100%;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
+      grid-template-columns: minmax(0, 1fr) 295px;
       overflow: hidden;
+    }
+    .workspace-split.sidebar-collapsed {
+      grid-template-columns: minmax(0, 1fr);
     }
     .canvas-viewport {
       height: 100%;
@@ -1119,33 +1594,37 @@ import {
       min-width: 0;
       overflow-y: scroll;
       overflow-x: auto;
-      padding: 20px 28px 120px;
+      padding: 16px 24px 80px;
       display: block;
       position: relative;
-      background: #cbd5e1;
+      background: #edebe9;
+    }
+    .canvas-zoom-stage {
+      width: fit-content;
+      margin: 0 auto;
     }
     .horizontal-ruler {
-      height: 22px;
-      background: #f8fafc;
-      border: 1px solid #94a3b8;
+      height: 20px;
+      background: #ffffff;
+      border: 1px solid #c8c6c4;
       position: relative;
       margin: 0 auto 6px;
-      box-shadow: inset 0 -2px 0 #cbd5e1;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
     .ruler-tick {
       position: absolute;
       top: 2px;
-      font-size: 9px;
-      color: #475569;
-      border-left: 1px solid #64748b;
+      font-size: 8.5px;
+      color: #605e5c;
+      border-left: 1px solid #a19f9d;
       padding-left: 2px;
-      height: 16px;
+      height: 14px;
     }
     .indent-marker {
       position: absolute;
       bottom: -2px;
-      color: #2563eb;
-      font-size: 11px;
+      color: #185abd;
+      font-size: 10px;
       font-weight: 700;
     }
     .canvas-row-wrap {
@@ -1155,32 +1634,55 @@ import {
       gap: 6px;
       width: fit-content;
       margin: 0 auto;
-      padding-bottom: 80px;
+      padding-bottom: 36px;
     }
     .vertical-ruler {
-      width: 22px;
-      background: #f8fafc;
-      border: 1px solid #94a3b8;
+      width: 20px;
+      background: #ffffff;
+      border: 1px solid #c8c6c4;
       position: relative;
     }
     .v-ruler-tick {
       position: absolute;
       left: 2px;
-      font-size: 9px;
-      color: #475569;
-      border-top: 1px solid #64748b;
-      width: 16px;
+      font-size: 8.5px;
+      color: #605e5c;
+      border-top: 1px solid #a19f9d;
+      width: 14px;
     }
     .page-sheet {
       background: #ffffff;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
-      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.14), 0 0 1px rgba(0, 0, 0, 0.22);
+      border: 1px solid #d2d0ce;
       position: relative;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      transform-origin: top center;
       user-select: text;
+    }
+    .crop-mark {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.45;
+    }
+    .crop-tl {
+      border-top: 1px solid #a19f9d;
+      border-left: 1px solid #a19f9d;
+    }
+    .crop-tr {
+      border-top: 1px solid #a19f9d;
+      border-right: 1px solid #a19f9d;
+    }
+    .crop-bl {
+      border-bottom: 1px solid #a19f9d;
+      border-left: 1px solid #a19f9d;
+    }
+    .crop-br {
+      border-bottom: 1px solid #a19f9d;
+      border-right: 1px solid #a19f9d;
     }
     .watermark-layer {
       position: absolute;
@@ -1206,35 +1708,93 @@ import {
       z-index: 2;
     }
     .header-region {
-      border-bottom: 1px dashed #cbd5e1;
-      padding-bottom: 8px;
-      margin-bottom: 12px;
+      border-bottom: 1px dashed transparent;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+      transition: border-color 0.15s;
     }
     .footer-region {
-      border-top: 1px dashed #cbd5e1;
-      padding-top: 8px;
-      margin-top: 12px;
+      border-top: 1px dashed transparent;
+      padding-top: 6px;
+      margin-top: 10px;
+      transition: border-color 0.15s;
+    }
+    .page-sheet:hover .header-region,
+    .page-sheet:hover .footer-region,
+    .header-region.region-focused,
+    .footer-region.region-focused {
+      border-color: #c8c6c4;
     }
     .region-badge {
       position: absolute;
       right: 0;
-      top: -14px;
-      font-size: 9px;
+      top: -13px;
+      font-size: 8.5px;
       text-transform: uppercase;
-      color: #94a3b8;
+      color: #a19f9d;
       letter-spacing: 0.5px;
       pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .page-sheet:hover .region-badge,
+    .region-focused .region-badge {
+      opacity: 1;
     }
     .editable-surface {
       outline: none;
-      min-height: 36px;
+      min-height: 28px;
       font-family: Calibri, 'Segoe UI', Arial, sans-serif;
       font-size: 11pt;
-      line-height: 1.4;
+      line-height: 1.45;
       color: #0f172a;
     }
     .body-surface {
-      min-height: 210mm;
+      min-height: 215mm;
+    }
+    .word-status-bar {
+      flex: 0 0 26px;
+      height: 26px;
+      background: #f3f2f1;
+      border-top: 1px solid #d2d0ce;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 11px;
+      color: #323130;
+    }
+    .status-left, .status-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-sep {
+      color: #c8c6c4;
+    }
+    .status-mode-btn, .status-zoom-step {
+      border: 1px solid transparent;
+      background: transparent;
+      color: #323130;
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .status-mode-btn:hover, .status-zoom-step:hover {
+      background: #e1dfdd;
+    }
+    .status-zoom-slider {
+      width: 90px;
+      height: 4px;
+      cursor: pointer;
+      accent-color: #185abd;
+    }
+    .status-zoom-pct {
+      min-width: 34px;
+      text-align: right;
+      font-weight: 600;
+      cursor: pointer;
     }
     :host ::ng-deep .page-sheet.show-gridlines table,
     :host ::ng-deep .page-sheet.show-gridlines td,
@@ -1254,12 +1814,51 @@ import {
       font-weight: 600;
       cursor: context-menu;
     }
+    :host ::ng-deep .word-object {
+      position: relative;
+      box-sizing: border-box;
+      resize: both;
+      overflow: auto;
+      transition: box-shadow 0.12s;
+    }
+    :host ::ng-deep .word-object:hover {
+      outline: 1px dashed #185abd;
+    }
+    :host ::ng-deep .selected-word-object {
+      outline: 2px solid #185abd !important;
+      box-shadow: 0 0 0 3px rgba(24, 90, 189, 0.18) !important;
+    }
+    :host ::ng-deep .obj-drag-handle {
+      display: inline-block;
+      background: #185abd;
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      cursor: move;
+      user-select: none;
+      margin-bottom: 4px;
+    }
     :host ::ng-deep tr[data-repeater="true"] {
       background: rgba(236, 253, 245, 0.55);
       outline: 2px dashed #10b981;
     }
     :host ::ng-deep tr[data-repeat-header="true"] {
       outline: 2px solid #1e3a8a;
+    }
+    .btn-copy-tag-mini {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #93c5fd;
+      border-radius: 3px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-copy-tag-mini:hover {
+      background: #dbeafe;
     }
     .sql-drawer {
       width: 100%;
@@ -1649,19 +2248,55 @@ import {
     }
   `]
 })
-export class ReportDesignerComponent implements OnInit {
+export class ReportDesignerComponent implements OnInit, OnDestroy {
   private readonly managerApi = inject(ManagerApiService);
   private readonly reportApi = inject(ReportApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
+  readonly Math = Math;
+
   @ViewChild('headerEditor', { static: true }) headerEditorRef!: ElementRef<HTMLDivElement>;
   @ViewChild('bodyEditor', { static: true }) bodyEditorRef!: ElementRef<HTMLDivElement>;
   @ViewChild('footerEditor', { static: true }) footerEditorRef!: ElementRef<HTMLDivElement>;
 
-  readonly ribbonTab = signal<'home' | 'insert' | 'table' | 'layout' | 'view'>('home');
+  readonly ribbonTab = signal<'home' | 'insert' | 'table' | 'layout' | 'view' | 'object'>('home');
   readonly sidebarTab = signal<'fields' | 'filters'>('fields');
   readonly activeEditorRegion = signal<'header' | 'body' | 'footer'>('body');
+
+  readonly isFullScreen = signal<boolean>(false);
+  readonly isRibbonCollapsed = signal<boolean>(false);
+  readonly isRightSidebarOpen = signal<boolean>(true);
+
+  // Copy/Paste Alias & Selected Object (Text Box / Shape / Image) State
+  readonly lastCopiedField = signal<CatalogColumnDto | null>(null);
+  readonly hasSelectedObject = signal<boolean>(false);
+  readonly objRotationDeg = signal<number>(0);
+  readonly objWidthPx = signal<number>(260);
+  readonly objHeightPx = signal<number>(90);
+  readonly objIsFloating = signal<boolean>(false);
+  readonly objBgColor = signal<string>('#ffffff');
+  readonly objBorderColor = signal<string>('#185abd');
+
+  private selectedObjectEl: HTMLElement | null = null;
+  private savedSelectionRange: Range | null = null;
+  private draggingFloatingEl: HTMLElement | null = null;
+  private dragOffsetX = 0;
+  private dragOffsetY = 0;
+
+  private readonly nonPassiveWheelListener = (event: WheelEvent) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? 8 : -8;
+      this.zoomPercent.update((curr) => Math.max(40, Math.min(220, curr + delta)));
+    }
+  };
+
+  private readonly keydownEscapeListener = (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && this.isFullScreen()) {
+      this.isFullScreen.set(false);
+    }
+  };
 
   readonly savedTemplates = signal<SavedReportTemplateDto[]>([]);
   readonly currentTemplateId = signal<number | null>(null);
@@ -1733,7 +2368,7 @@ export class ReportDesignerComponent implements OnInit {
   };
 
   showGridlines = true;
-  readonly zoomPercent = signal<number>(100);
+  readonly zoomPercent = signal<number>(80);
   readonly showRulers = signal<boolean>(true);
   readonly firstLineIndentMm = signal<number>(0);
 
@@ -1868,6 +2503,10 @@ export class ReportDesignerComponent implements OnInit {
   ngOnInit(): void {
     this.initializeBlankDocumentSurface();
 
+    // Non-passive wheel listener so laptop Touchpad Pinch-to-Zoom (ctrlKey+wheel) zooms ONLY the Word Page, never the browser UI
+    window.addEventListener('wheel', this.nonPassiveWheelListener, { passive: false });
+    window.addEventListener('keydown', this.keydownEscapeListener);
+
     this.managerApi.getPublishedFields().subscribe({
       next: (fields) => {
         this.publishedFields.set(fields);
@@ -1886,6 +2525,30 @@ export class ReportDesignerComponent implements OnInit {
         }
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('wheel', this.nonPassiveWheelListener);
+    window.removeEventListener('keydown', this.keydownEscapeListener);
+  }
+
+  toggleFullScreen(): void {
+    const next = !this.isFullScreen();
+    this.isFullScreen.set(next);
+    if (next) {
+      this.isRightSidebarOpen.set(true);
+      this.isRibbonCollapsed.set(false);
+      this.flashToast('Full Screen Mode: Showing ONLY Word Ribbon, Page & Side Field Section (Press Esc or Reduce to exit)');
+    }
+  }
+
+  onCanvasWheelZoom(event: WheelEvent): void {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      const delta = event.deltaY < 0 ? 8 : -8;
+      this.zoomPercent.update((curr) => Math.max(40, Math.min(220, curr + delta)));
+    }
   }
 
   initializeBlankDocumentSurface(): void {
@@ -1973,7 +2636,31 @@ export class ReportDesignerComponent implements OnInit {
     }
   }
 
+  onEditorMouseDown(event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+
+    const objEl = target.closest(
+      '.word-object, .word-textbox, .word-shape, .word-callout, .word-signature-line, img'
+    ) as HTMLElement | null;
+
+    if (objEl) {
+      this.selectCanvasObject(objEl);
+
+      // Start dragging if it's a floating object and user clicks the top drag handle or border
+      if (objEl.getAttribute('data-floating') === 'true' || target.classList.contains('floating-drag-handle')) {
+        this.draggingFloatingEl = objEl;
+        const rect = objEl.getBoundingClientRect();
+        this.dragOffsetX = event.clientX - rect.left;
+        this.dragOffsetY = event.clientY - rect.top;
+      }
+    } else {
+      this.clearSelectedCanvasObject();
+    }
+  }
+
   onEditorMouseUp(): void {
+    this.saveCurrentSelectionRange();
     this.detectActiveTableFromSelection();
 
     if (this.formatPainterActive() && this.copiedInlineStyle) {
@@ -1988,6 +2675,86 @@ export class ReportDesignerComponent implements OnInit {
         this.formatPainterActive.set(false);
       }
     }
+  }
+
+  onEditorKeyUp(): void {
+    this.saveCurrentSelectionRange();
+    this.detectActiveTableFromSelection();
+    this.convertRawTypedMergeTokensInDom();
+    this.syncCanvasState();
+  }
+
+  onEditorPaste(event: ClipboardEvent): void {
+    const pastedText = event.clipboardData?.getData('text/plain') || '';
+    if (pastedText && /\{\{[^{}]+\}\}/.test(pastedText)) {
+      event.preventDefault();
+      this.insertTextWithAutoMergeTags(pastedText);
+      return;
+    }
+    setTimeout(() => {
+      this.convertRawTypedMergeTokensInDom();
+      this.syncCanvasState();
+    }, 30);
+  }
+
+  onCanvasMouseMove(event: MouseEvent): void {
+    if (!this.draggingFloatingEl) return;
+    const sheetEl = this.draggingFloatingEl.closest('.page-sheet') as HTMLElement | null;
+    if (!sheetEl) return;
+
+    const sheetRect = sheetEl.getBoundingClientRect();
+    const scale = (this.zoomPercent() || 100) / 100;
+    const newLeft = Math.max(4, (event.clientX - sheetRect.left - this.dragOffsetX) / scale);
+    const newTop = Math.max(4, (event.clientY - sheetRect.top - this.dragOffsetY) / scale);
+
+    this.draggingFloatingEl.style.left = `${Math.round(newLeft)}px`;
+    this.draggingFloatingEl.style.top = `${Math.round(newTop)}px`;
+  }
+
+  onCanvasMouseUp(): void {
+    if (this.draggingFloatingEl) {
+      this.draggingFloatingEl = null;
+      this.syncCanvasState();
+    }
+  }
+
+  private saveCurrentSelectionRange(): void {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const hostEl = container.nodeType === 1 ? (container as HTMLElement) : container.parentElement;
+    if (
+      hostEl &&
+      (this.headerEditorRef.nativeElement.contains(hostEl) ||
+        this.bodyEditorRef.nativeElement.contains(hostEl) ||
+        this.footerEditorRef.nativeElement.contains(hostEl))
+    ) {
+      this.savedSelectionRange = range.cloneRange();
+    }
+  }
+
+  private selectCanvasObject(el: HTMLElement): void {
+    if (this.selectedObjectEl && this.selectedObjectEl !== el) {
+      this.selectedObjectEl.classList.remove('selected-word-object');
+    }
+    this.selectedObjectEl = el;
+    el.classList.add('selected-word-object');
+    this.hasSelectedObject.set(true);
+
+    const rotAttr = Number(el.getAttribute('data-rotation') || '0');
+    this.objRotationDeg.set(Number.isFinite(rotAttr) ? rotAttr : 0);
+    this.objWidthPx.set(Math.round(el.offsetWidth || 260));
+    this.objHeightPx.set(Math.round(el.offsetHeight || 90));
+    this.objIsFloating.set(el.getAttribute('data-floating') === 'true');
+  }
+
+  private clearSelectedCanvasObject(): void {
+    if (this.selectedObjectEl) {
+      this.selectedObjectEl.classList.remove('selected-word-object');
+    }
+    this.selectedObjectEl = null;
+    this.hasSelectedObject.set(false);
   }
 
   runFindAndReplace(): void {
@@ -2168,14 +2935,204 @@ export class ReportDesignerComponent implements OnInit {
 
   insertCalloutBox(): void {
     this.insertHtmlIntoActiveEditor(
-      '<div class="word-callout" style="border:1px solid #60a5fa;background:#eff6ff;padding:12px;border-radius:6px;margin:10px 0;"><strong>Callout / Note:</strong> Enter important summary remarks or merge tags here.</div><p></p>'
+      '<div class="word-object word-callout" data-rotation="0" style="border:1px solid #60a5fa;background:#eff6ff;padding:12px;border-radius:6px;margin:10px 0;resize:both;overflow:auto;"><strong>Callout / Note:</strong> Enter important summary remarks or paste {{Table.Alias}} merge tags here.</div><p></p>'
     );
   }
 
   insertSignatureLine(): void {
     this.insertHtmlIntoActiveEditor(
-      '<div class="word-signature-line" style="display:flex;justify-content:space-between;margin-top:32px;"><div style="border-top:1px solid #0f172a;width:200px;padding-top:4px;font-size:10pt;">Authorized Signatory</div><div style="border-top:1px solid #0f172a;width:200px;padding-top:4px;font-size:10pt;">Receiver Signature &amp; Date</div></div><p></p>'
+      '<div class="word-object word-signature-line" data-rotation="0" style="display:flex;justify-content:space-between;margin-top:32px;padding:6px;"><div style="border-top:1px solid #0f172a;width:200px;padding-top:4px;font-size:10pt;">Authorized Signatory</div><div style="border-top:1px solid #0f172a;width:200px;padding-top:4px;font-size:10pt;">Receiver Signature &amp; Date</div></div><p></p>'
     );
+  }
+
+  insertTextBox(mode: 'inline' | 'floating'): void {
+    if (mode === 'floating') {
+      const floatingHtml =
+        '<div class="word-object word-textbox floating-word-object" data-floating="true" data-rotation="0" style="position:absolute;top:110px;left:120px;width:260px;min-height:90px;z-index:30;border:1.5px solid #185abd;background:#ffffff;padding:10px 12px;border-radius:4px;box-shadow:0 6px 18px rgba(15,23,42,0.14);resize:both;overflow:auto;">' +
+        '<div class="floating-drag-handle" contenteditable="false" style="font-size:9px;font-weight:700;color:#185abd;background:#eff6ff;margin:-10px -12px 6px -12px;padding:3px 8px;cursor:move;border-bottom:1px solid #bfdbfe;display:flex;justify-content:space-between;"><span>✥ FLOATING TEXT BOX (Drag to Move / Click to Rotate)</span><span>🔄</span></div>' +
+        '<div><strong>Text Box Heading</strong><br/>Type text, drag fields, or paste {{Table.Alias}} here...</div>' +
+        '</div>';
+      this.insertHtmlIntoActiveEditor(floatingHtml);
+      this.ribbonTab.set('object');
+      this.flashToast('Inserted Movable Floating Text Box — Drag header to position or use Shape & Object Format tab to rotate');
+      return;
+    }
+
+    const inlineHtml =
+      '<div class="word-object word-textbox" data-floating="false" data-rotation="0" style="display:inline-block;width:260px;min-height:80px;border:1.5px solid #185abd;background:#ffffff;padding:10px 12px;border-radius:4px;margin:8px 4px;vertical-align:top;resize:both;overflow:auto;">' +
+      '<strong>Text Box</strong><br/>Type text, drag fields, or paste {{Table.Alias}} here...' +
+      '</div><p></p>';
+    this.insertHtmlIntoActiveEditor(inlineHtml);
+    this.ribbonTab.set('object');
+    this.flashToast('Inserted Resizable Word Text Box — Click inside to type or use Shape & Object Format to rotate');
+  }
+
+  insertStampBadge(): void {
+    const stampHtml =
+      '<div class="word-object word-shape" data-floating="false" data-rotation="-15" style="display:inline-block;border:3px double #dc2626;color:#dc2626;background:rgba(254,242,242,0.85);padding:8px 18px;border-radius:6px;font-weight:800;font-size:14pt;letter-spacing:0.12em;text-align:center;transform:rotate(-15deg);margin:12px;">' +
+      'APPROVED / VERIFIED' +
+      '</div><p></p>';
+    this.insertHtmlIntoActiveEditor(stampHtml);
+    this.ribbonTab.set('object');
+    this.flashToast('Inserted Rotated Stamp Badge (-15°) — Adjust angle anytime in Shape & Object Format tab');
+  }
+
+  insertShapePreset(shape: string): void {
+    if (!shape) return;
+    let html = '';
+    if (shape === 'rect') {
+      html =
+        '<div class="word-object word-shape" data-rotation="0" style="display:inline-block;width:220px;min-height:70px;border:2px solid #185abd;background:#eff6ff;border-radius:8px;padding:12px;text-align:center;margin:8px;resize:both;overflow:auto;"><strong>Rounded Rectangle</strong><br/>Click to edit or rotate</div><p></p>';
+    } else if (shape === 'pill') {
+      html =
+        '<div class="word-object word-shape" data-rotation="0" style="display:inline-block;min-width:160px;border:2px solid #047857;background:#ecfdf5;color:#065f46;border-radius:999px;padding:8px 20px;font-weight:700;text-align:center;margin:8px;">STATUS: IN TRANSIT</div><p></p>';
+    } else if (shape === 'banner') {
+      html =
+        '<div class="word-object word-shape" data-rotation="0" style="width:100%;border-left:6px solid #185abd;background:linear-gradient(90deg,#dbeafe,#f8fafc);padding:10px 16px;font-weight:700;color:#1e3a8a;margin:10px 0;">SECTION BANNER HEADING</div><p></p>';
+    } else if (shape === 'circle') {
+      html =
+        '<div class="word-object word-shape" data-rotation="0" style="display:inline-flex;align-items:center;justify-content:center;width:96px;height:96px;border:3px solid #1e3a8a;background:#eff6ff;color:#1e3a8a;border-radius:50%;font-weight:800;font-size:10pt;text-align:center;margin:8px;">OFFICIAL<br/>SEAL</div><p></p>';
+    } else if (shape === 'arrow-right') {
+      html =
+        '<div class="word-object word-shape" data-rotation="0" style="display:inline-block;background:#185abd;color:#ffffff;padding:8px 24px;clip-path:polygon(0% 20%, 75% 20%, 75% 0%, 100% 50%, 75% 100%, 75% 80%, 0% 80%);font-weight:700;margin:8px;">NEXT STEP ➔</div><p></p>';
+    } else if (shape === 'warning') {
+      html =
+        '<div class="word-object word-shape" data-rotation="0" style="border:2px dashed #d97706;background:#fffbeb;color:#92400e;padding:10px 14px;border-radius:6px;margin:8px 0;"><strong>⚠ IMPORTANT NOTICE:</strong> Verify consignment seal and driver particulars before dispatch.</div><p></p>';
+    }
+    if (html) {
+      this.insertHtmlIntoActiveEditor(html);
+      this.ribbonTab.set('object');
+    }
+  }
+
+  // ==================== OBJECT ROTATION, RESIZING & FLOATING CONTROLS ====================
+
+  rotateSelectedObjectBy(deltaDeg: number): void {
+    const next = ((this.objRotationDeg() + deltaDeg + 180) % 360) - 180;
+    this.setSelectedObjectRotation(next);
+  }
+
+  setSelectedObjectRotation(deg: number): void {
+    const clamped = Math.max(-180, Math.min(180, Number(deg) || 0));
+    this.objRotationDeg.set(clamped);
+
+    const target = this.getOrFallbackSelectedObject();
+    if (!target) {
+      this.flashToast('Click any Text Box, Shape, Stamp, or Image on the page first to rotate it');
+      return;
+    }
+
+    target.setAttribute('data-rotation', String(clamped));
+    target.style.transform = clamped === 0 ? '' : `rotate(${clamped}deg)`;
+    this.syncCanvasState();
+  }
+
+  setSelectedObjectSize(widthPx: number, heightPx: number): void {
+    const w = Math.max(40, Math.min(900, Number(widthPx) || 240));
+    const h = Math.max(24, Math.min(900, Number(heightPx) || 80));
+    this.objWidthPx.set(w);
+    this.objHeightPx.set(h);
+
+    const target = this.getOrFallbackSelectedObject();
+    if (!target) return;
+    target.style.width = `${w}px`;
+    target.style.minHeight = `${h}px`;
+    this.syncCanvasState();
+  }
+
+  toggleSelectedObjectFloating(): void {
+    const target = this.getOrFallbackSelectedObject();
+    if (!target) {
+      this.flashToast('Click a Text Box, Shape, or Image first to toggle Floating vs Inline mode');
+      return;
+    }
+
+    const currentlyFloating = target.getAttribute('data-floating') === 'true';
+    if (currentlyFloating) {
+      target.setAttribute('data-floating', 'false');
+      target.classList.remove('floating-word-object');
+      target.style.position = '';
+      target.style.top = '';
+      target.style.left = '';
+      target.style.zIndex = '';
+      this.objIsFloating.set(false);
+      this.flashToast('Object set to Inline with Text');
+    } else {
+      target.setAttribute('data-floating', 'true');
+      target.classList.add('floating-word-object');
+      target.style.position = 'absolute';
+      target.style.top = target.style.top || '120px';
+      target.style.left = target.style.left || '120px';
+      target.style.zIndex = '30';
+      this.objIsFloating.set(true);
+      this.flashToast('Object set to Floating Over Page — Use Drag or Arrow buttons to position anywhere');
+    }
+    this.syncCanvasState();
+  }
+
+  nudgeSelectedObject(dx: number, dy: number): void {
+    const target = this.getOrFallbackSelectedObject();
+    if (!target) return;
+
+    if (target.getAttribute('data-floating') !== 'true') {
+      this.toggleSelectedObjectFloating();
+    }
+    const curLeft = parseFloat(target.style.left || '120') || 120;
+    const curTop = parseFloat(target.style.top || '120') || 120;
+    target.style.left = `${Math.max(0, curLeft + dx)}px`;
+    target.style.top = `${Math.max(0, curTop + dy)}px`;
+    this.syncCanvasState();
+  }
+
+  setSelectedObjectFill(color: string): void {
+    this.objBgColor.set(color);
+    const target = this.getOrFallbackSelectedObject();
+    if (target) {
+      target.style.backgroundColor = color;
+      this.syncCanvasState();
+    }
+  }
+
+  setSelectedObjectBorderColor(color: string): void {
+    this.objBorderColor.set(color);
+    const target = this.getOrFallbackSelectedObject();
+    if (target) {
+      target.style.borderColor = color;
+      this.syncCanvasState();
+    }
+  }
+
+  setSelectedObjectBorderStyle(stylePrefix: string): void {
+    if (!stylePrefix) return;
+    const target = this.getOrFallbackSelectedObject();
+    if (!target) return;
+    if (stylePrefix === 'none') {
+      target.style.border = 'none';
+    } else {
+      target.style.border = `${stylePrefix} ${this.objBorderColor()}`;
+    }
+    this.syncCanvasState();
+  }
+
+  deleteSelectedObject(): void {
+    const target = this.getOrFallbackSelectedObject();
+    if (!target) return;
+    target.remove();
+    this.clearSelectedCanvasObject();
+    this.syncCanvasState();
+  }
+
+  private getOrFallbackSelectedObject(): HTMLElement | null {
+    if (this.selectedObjectEl && document.body.contains(this.selectedObjectEl)) {
+      return this.selectedObjectEl;
+    }
+    const lastInserted = this.bodyEditorRef.nativeElement.querySelector(
+      '.word-object:last-of-type, .word-textbox:last-of-type, .word-shape:last-of-type, img:last-of-type'
+    ) as HTMLElement | null;
+    if (lastInserted) {
+      this.selectCanvasObject(lastInserted);
+    }
+    return this.selectedObjectEl;
   }
 
   insertHyperlink(): void {
@@ -2467,6 +3424,144 @@ export class ReportDesignerComponent implements OnInit {
   onFieldClickInsert(field: CatalogColumnDto, isReachable: boolean): void {
     if (!isReachable) return;
     this.tryBindFieldOntoCanvas(field);
+  }
+
+  copyFieldMergeTag(field: CatalogColumnDto, isReachable: boolean): void {
+    if (!isReachable) {
+      this.flashToast(`Cannot copy "${field.displayName}": Table "${field.tableName}" is locked (no FK path to anchor)`);
+      return;
+    }
+    this.lastCopiedField.set(field);
+    const token = `{{${field.tableName}.${field.displayName}}}`;
+    navigator.clipboard?.writeText(token).catch(() => {});
+    this.flashToast(`Copied ${token} — Paste (Ctrl+V) or type it anywhere in the page, table, or text box!`);
+  }
+
+  pasteCopiedFieldTag(): void {
+    const fld = this.lastCopiedField();
+    if (!fld) return;
+    this.tryBindFieldOntoCanvas(fld);
+  }
+
+  private insertTextWithAutoMergeTags(rawText: string): void {
+    const htmlWithTags = rawText.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (fullMatch, inner: string) => {
+      const tokenText = inner.trim();
+      if (tokenText.toUpperCase().startsWith('SYSTEM.')) {
+        return `<span>{{${tokenText}}}</span>`;
+      }
+      const matchedField = this.findCatalogFieldByToken(tokenText);
+      if (!matchedField) {
+        return fullMatch;
+      }
+      return this.registerAndBuildMergeTagSpan(matchedField);
+    });
+    this.insertHtmlIntoActiveEditor(htmlWithTags);
+  }
+
+  private convertRawTypedMergeTokensInDom(): void {
+    const regions = [
+      this.headerEditorRef.nativeElement,
+      this.bodyEditorRef.nativeElement,
+      this.footerEditorRef.nativeElement
+    ];
+
+    let convertedAny = false;
+    for (const root of regions) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const textNodesToProcess: Text[] = [];
+      let current = walker.nextNode();
+      while (current) {
+        const parentEl = current.parentElement;
+        if (
+          parentEl &&
+          !parentEl.closest('.merge-tag') &&
+          current.nodeValue &&
+          /\{\{[^{}]+\}\}/.test(current.nodeValue)
+        ) {
+          textNodesToProcess.push(current as Text);
+        }
+        current = walker.nextNode();
+      }
+
+      for (const textNode of textNodesToProcess) {
+        const raw = textNode.nodeValue || '';
+        let nodeChanged = false;
+        const replacedHtml = raw.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (full, inner: string) => {
+          const tokenText = inner.trim();
+          if (tokenText.toUpperCase().startsWith('SYSTEM.')) {
+            return full;
+          }
+          const matchedField = this.findCatalogFieldByToken(tokenText);
+          if (!matchedField) return full;
+          nodeChanged = true;
+          convertedAny = true;
+          return this.registerAndBuildMergeTagSpan(matchedField);
+        });
+
+        if (nodeChanged && textNode.parentNode) {
+          const wrapper = document.createElement('span');
+          wrapper.innerHTML = replacedHtml + '&nbsp;';
+          textNode.parentNode.replaceChild(wrapper, textNode);
+        }
+      }
+    }
+
+    if (convertedAny) {
+      this.refreshReachabilityAndSql();
+      this.flashToast('Bound typed/pasted {{Table.Alias}} merge tag to SQL query!');
+    }
+  }
+
+  private findCatalogFieldByToken(tokenText: string): CatalogColumnDto | null {
+    const normalized = tokenText.trim().toLowerCase();
+    const allFields = this.publishedFields();
+
+    if (normalized.includes('.')) {
+      const [tblPart, ...rest] = normalized.split('.');
+      const fieldPart = rest.join('.').trim();
+      const exactMatch = allFields.find(
+        (f) =>
+          f.tableName.toLowerCase() === tblPart.trim() &&
+          (f.displayName.toLowerCase() === fieldPart || f.columnName.toLowerCase() === fieldPart)
+      );
+      if (exactMatch) return exactMatch;
+    }
+
+    return (
+      allFields.find(
+        (f) => f.displayName.toLowerCase() === normalized || f.columnName.toLowerCase() === normalized
+      ) ?? null
+    );
+  }
+
+  private registerAndBuildMergeTagSpan(field: CatalogColumnDto): string {
+    const tableAlias = field.tableName;
+    const colSqlAlias = `${tableAlias}_${field.columnName}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const displayLabel = field.displayName;
+    const isRepeater = this.activeTableRowElement?.getAttribute('data-repeater') === 'true';
+
+    const alreadySelected = this.selectedFields().some((s) => s.columnSqlAlias === colSqlAlias);
+    if (!alreadySelected) {
+      const newSelected: SelectedFieldDto = {
+        fieldId: field.fieldId,
+        schemaName: field.schemaName,
+        tableName: field.tableName,
+        columnName: field.columnName,
+        tableAlias,
+        columnSqlAlias: colSqlAlias,
+        displayName: displayLabel,
+        dataType: field.dataType,
+        AggregateFunction: 'NONE',
+        aggregateFunction: 'NONE',
+        isRepeaterField: isRepeater,
+        repeaterTableName: isRepeater ? tableAlias : null,
+        roleConstraintName: null,
+        roleLabel: null
+      } as SelectedFieldDto;
+      this.selectedFields.update((curr) => [...curr, newSelected]);
+    }
+
+    return `<span class="merge-tag" contenteditable="false" data-table="${field.tableName}" data-column="${field.columnName}" data-alias="${colSqlAlias}" data-table-alias="${tableAlias}" data-format="" data-transform="" data-aggregate="NONE" data-null-default="">{{${tableAlias}.${displayLabel}}}</span>`;
   }
 
   private tryBindFieldOntoCanvas(field: CatalogColumnDto): void {
@@ -2808,7 +3903,21 @@ export class ReportDesignerComponent implements OnInit {
           : this.bodyEditorRef.nativeElement;
 
     targetEl.focus();
+
+    if (this.savedSelectionRange) {
+      const container = this.savedSelectionRange.commonAncestorContainer;
+      const hostEl = container.nodeType === 1 ? (container as HTMLElement) : container.parentElement;
+      if (hostEl && targetEl.contains(hostEl)) {
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(this.savedSelectionRange);
+        }
+      }
+    }
+
     document.execCommand('insertHTML', false, html);
+    this.saveCurrentSelectionRange();
     this.syncCanvasState();
   }
 
