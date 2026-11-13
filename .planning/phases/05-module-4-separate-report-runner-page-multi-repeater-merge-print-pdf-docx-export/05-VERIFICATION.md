@@ -17,3 +17,4 @@ score: 4/4 must-haves verified
 | EXEC-02 (Cartesian-Free Multi-Repeater Row Deduplication) | ✓ SATISFIED |
 | EXEC-03 (Single/Batch Document Mode Grouped by Anchor PK & Summary List Mode + Aggregates) | ✓ SATISFIED |
 | EXEC-04 (Browser Print Preview, PDF Export & Native OpenXML Word .docx Export) | ✓ SATISFIED |
+

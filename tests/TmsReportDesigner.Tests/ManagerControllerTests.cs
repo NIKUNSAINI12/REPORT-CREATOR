@@ -51,3 +51,4 @@ public class ManagerControllerTests
         Assert.NotEmpty(published);
     }
 }
+

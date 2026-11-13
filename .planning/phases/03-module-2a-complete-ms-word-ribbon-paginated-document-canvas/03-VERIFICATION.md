@@ -21,3 +21,4 @@ score: 8/8 must-haves verified
 | WORD-06 (Contextual Table Design & Layout, Merge/Split, Borders/Shading, Header Repeat, Data Repeater Row) | ✓ SATISFIED |
 | WORD-07 (Page Setup A4/Letter/Legal/A3/A5/Custom, Portrait/Landscape, Margins, Columns, Watermark) | ✓ SATISFIED |
 | WORD-08 (Zoom 50%-200%, Horizontal/Vertical Rulers, Table Gridlines) | ✓ SATISFIED |
+

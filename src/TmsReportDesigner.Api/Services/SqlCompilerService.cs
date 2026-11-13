@@ -257,3 +257,4 @@ public sealed class SqlCompilerService : ISqlCompilerService
         return Regex.Replace(raw.Trim(), @"[^a-zA-Z0-9_]", "_");
     }
 }
+

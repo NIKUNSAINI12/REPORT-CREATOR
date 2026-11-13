@@ -75,3 +75,4 @@ public class SqlCompilerAndTemplateTests
         Assert.Equal(seeded.TemplateName, loaded!.TemplateName);
     }
 }
+

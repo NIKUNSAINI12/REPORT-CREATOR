@@ -84,3 +84,4 @@ public class ReportExecutionAndExportTests
         Assert.Equal("%PDF-", pdfHeader);
     }
 }
+

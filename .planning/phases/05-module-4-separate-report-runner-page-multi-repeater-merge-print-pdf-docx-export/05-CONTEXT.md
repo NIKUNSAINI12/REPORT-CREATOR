@@ -18,3 +18,4 @@ Deliver the dedicated **Report Runner & Export Engine** (`/reports` and `/report
    - Provides Browser Print Preview (`window.print()` with `@media print` page breaks), PDF stream download (`/api/reports/:id/export/pdf`), and native OpenXML Word `.docx` download (`/api/reports/:id/export/docx` using `DocumentFormat.OpenXml` preserving `PageSize`, `PageMargin`, `Columns`, headers/footers, tables, and batch page breaks).
 
 </domain>
+

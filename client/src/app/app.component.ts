@@ -55,22 +55,25 @@ export interface SchemaStatusSummary {
       overflow: hidden;
     }
     .top-nav {
-      flex: 0 0 52px;
+      flex: 0 0 auto;
+      min-height: 48px;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
       background: #1e3a8a;
       color: #ffffff;
-      padding: 0 20px;
-      height: 52px;
+      padding: 6px 14px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
     .brand {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
+      white-space: nowrap;
     }
     .brand-badge {
       background: #2563eb;
