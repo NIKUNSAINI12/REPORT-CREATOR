@@ -239,10 +239,19 @@ import {
     </div>
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      min-height: 0;
+      height: calc(100vh - 52px);
+      overflow: hidden;
+    }
     .runner-shell {
       display: grid;
-      grid-template-columns: 340px 1fr;
-      height: calc(100vh - 52px);
+      grid-template-columns: 340px minmax(0, 1fr);
+      height: 100%;
+      min-height: 0;
       overflow: hidden;
       background: #cbd5e1;
     }
@@ -252,6 +261,7 @@ import {
       display: flex;
       flex-direction: column;
       height: 100%;
+      min-height: 0;
       overflow: hidden;
     }
     .sidebar-top {
@@ -301,8 +311,9 @@ import {
       font-size: 12px;
     }
     .filters-scroll {
-      flex: 1;
-      overflow-y: auto;
+      flex: 1 1 0%;
+      min-height: 0;
+      overflow-y: scroll;
       padding: 14px;
       display: flex;
       flex-direction: column;
@@ -411,6 +422,8 @@ import {
       display: flex;
       flex-direction: column;
       height: 100%;
+      min-height: 0;
+      min-width: 0;
       overflow: hidden;
     }
     .preview-toolbar {
@@ -469,13 +482,14 @@ import {
       white-space: pre-wrap;
     }
     .sheets-scroll-container {
-      flex: 1;
-      overflow: auto;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 24px;
+      flex: 1 1 0%;
+      min-height: 0;
+      min-width: 0;
+      height: 100%;
+      overflow-y: scroll;
+      overflow-x: auto;
+      padding: 24px 24px 100px;
+      display: block;
     }
     .rendered-page-sheet {
       background: #ffffff;
@@ -486,6 +500,7 @@ import {
       justify-content: space-between;
       box-sizing: border-box;
       overflow: hidden;
+      margin: 0 auto 28px;
     }
     .sheet-watermark {
       position: absolute;

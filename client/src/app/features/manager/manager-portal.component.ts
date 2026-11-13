@@ -329,10 +329,19 @@ import {
     </div>
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      min-height: 0;
+      height: calc(100vh - 52px);
+      overflow: hidden;
+    }
     .manager-shell {
       display: grid;
-      grid-template-columns: 330px 1fr;
-      height: calc(100vh - 52px);
+      grid-template-columns: 330px minmax(0, 1fr);
+      height: 100%;
+      min-height: 0;
       overflow: hidden;
       background: #f8fafc;
     }
@@ -342,6 +351,7 @@ import {
       display: flex;
       flex-direction: column;
       height: 100%;
+      min-height: 0;
       overflow: hidden;
     }
     .sidebar-header {
@@ -402,8 +412,9 @@ import {
       font-weight: 600;
     }
     .table-list {
-      flex: 1;
-      overflow-y: auto;
+      flex: 1 1 0%;
+      min-height: 0;
+      overflow-y: scroll;
       padding: 6px;
     }
     .table-item {
@@ -479,6 +490,8 @@ import {
       display: flex;
       flex-direction: column;
       height: 100%;
+      min-height: 0;
+      min-width: 0;
       overflow: hidden;
     }
     .toolbar {
@@ -587,9 +600,12 @@ import {
       text-transform: uppercase;
     }
     .virtual-grid-viewport {
-      flex: 1;
+      flex: 1 1 0%;
+      min-height: 0;
+      height: 100%;
       width: 100%;
       background: #ffffff;
+      overflow-y: scroll !important;
     }
     .grid-row {
       display: grid;
@@ -643,8 +659,10 @@ import {
       cursor: pointer;
     }
     .relationships-container {
+      flex: 1 1 0%;
+      min-height: 0;
       padding: 20px;
-      overflow-y: auto;
+      overflow-y: scroll;
       display: flex;
       flex-direction: column;
       gap: 20px;

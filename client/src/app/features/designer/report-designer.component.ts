@@ -888,15 +888,26 @@ import {
     </div>
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      min-height: 0;
+      height: calc(100vh - 52px);
+      overflow: hidden;
+    }
     .designer-root {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 52px);
+      flex: 1 1 0%;
+      height: 100%;
+      min-height: 0;
       overflow: hidden;
       background: #e2e8f0;
       user-select: none;
     }
     .template-bar {
+      flex: 0 0 auto;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -970,6 +981,7 @@ import {
       cursor: pointer;
     }
     .word-ribbon {
+      flex: 0 0 auto;
       background: #f8fafc;
       border-bottom: 1px solid #cbd5e1;
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
@@ -1093,25 +1105,31 @@ import {
       border-radius: 4px;
     }
     .workspace-split {
-      flex: 1;
+      flex: 1 1 0%;
+      min-height: 0;
+      min-width: 0;
+      height: 100%;
       display: grid;
-      grid-template-columns: 1fr 350px;
+      grid-template-columns: minmax(0, 1fr) 360px;
       overflow: hidden;
     }
     .canvas-viewport {
-      overflow: auto;
-      padding: 16px 24px 60px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      overflow-y: scroll;
+      overflow-x: auto;
+      padding: 20px 28px 120px;
+      display: block;
       position: relative;
+      background: #cbd5e1;
     }
     .horizontal-ruler {
       height: 22px;
       background: #f8fafc;
       border: 1px solid #94a3b8;
       position: relative;
-      margin-bottom: 6px;
+      margin: 0 auto 6px;
       box-shadow: inset 0 -2px 0 #cbd5e1;
     }
     .ruler-tick {
@@ -1133,7 +1151,11 @@ import {
     .canvas-row-wrap {
       display: flex;
       align-items: flex-start;
+      justify-content: center;
       gap: 6px;
+      width: fit-content;
+      margin: 0 auto;
+      padding-bottom: 80px;
     }
     .vertical-ruler {
       width: 22px;
@@ -1242,7 +1264,7 @@ import {
     .sql-drawer {
       width: 100%;
       max-width: 900px;
-      margin-top: 18px;
+      margin: 18px auto 40px;
       background: #0f172a;
       color: #e2e8f0;
       border-radius: 8px;
@@ -1269,6 +1291,8 @@ import {
       display: flex;
       flex-direction: column;
       height: 100%;
+      min-height: 0;
+      min-width: 0;
       overflow: hidden;
     }
     .sidebar-tabs {
@@ -1344,8 +1368,9 @@ import {
       font-size: 12.5px;
     }
     .field-groups-scroll {
-      flex: 1;
-      overflow-y: auto;
+      flex: 1 1 0%;
+      min-height: 0;
+      overflow-y: scroll;
       padding: 8px;
     }
     .table-field-group {
@@ -1457,8 +1482,9 @@ import {
       cursor: pointer;
     }
     .filter-builder-pane {
-      flex: 1;
-      overflow-y: auto;
+      flex: 1 1 0%;
+      min-height: 0;
+      overflow-y: scroll;
       padding: 12px;
       display: flex;
       flex-direction: column;

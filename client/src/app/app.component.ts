@@ -50,9 +50,12 @@ export interface SchemaStatusSummary {
     .app-shell {
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
     }
     .top-nav {
+      flex: 0 0 52px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -117,9 +120,12 @@ export interface SchemaStatusSummary {
       font-weight: 500;
     }
     .main-viewport {
-      flex: 1;
+      flex: 1 1 0%;
+      min-height: 0;
+      min-width: 0;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
   `]
 })
