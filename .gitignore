@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+client/node_modules/
+client/dist/
+client/.angular/
+*.log
+
