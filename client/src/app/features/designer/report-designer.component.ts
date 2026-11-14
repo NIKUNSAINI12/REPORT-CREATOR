@@ -722,140 +722,162 @@ import {
 
       <!-- Main Split Workspace: Paginated Canvas (Left/Center) + Governed Field & Filter Sidebar (Right) -->
       <div class="workspace-split" [class.sidebar-collapsed]="!isRightSidebarOpen()">
-        <!-- Center Canvas Area with Horizontal & Vertical Rulers -->
-        <div
-          class="canvas-viewport"
-          (mousemove)="onCanvasMouseMove($event)"
-          (mouseup)="onCanvasMouseUp()"
-        >
-          <div class="canvas-zoom-stage" [style.zoom]="zoomPercent() + '%'">
-            @if (showRulers()) {
-              <div class="horizontal-ruler" [style.width.mm]="effectivePageWidthMm()">
-                @for (cm of horizontalRulerTicks(); track cm) {
-                  <span class="ruler-tick" [style.left.mm]="cm * 10">{{ cm }}</span>
-                }
+        <!-- Center Canvas Area with Extreme-Top Horizontal Ruler & Extreme-Left Vertical Ruler -->
+        <div class="canvas-main-column">
+          @if (showRulers()) {
+            <div class="word-top-ruler-bar">
+              <div class="ruler-corner-box" title="Ruler Origin">∟</div>
+              <div class="top-ruler-track-viewport">
                 <div
-                  class="indent-marker"
-                  [style.left.mm]="pageSetup.marginLeftMm + firstLineIndentMm()"
-                  title="First-line Indent Marker"
-                >▼</div>
+                  class="horizontal-ruler"
+                  [style.zoom]="zoomPercent() + '%'"
+                  [style.width.mm]="effectivePageWidthMm()"
+                >
+                  <div class="ruler-margin-band ruler-band-left" [style.width.mm]="pageSetup.marginLeftMm"></div>
+                  <div class="ruler-margin-band ruler-band-right" [style.width.mm]="pageSetup.marginRightMm"></div>
+                  @for (cm of horizontalRulerTicks(); track cm) {
+                    <span class="ruler-tick" [style.left.mm]="cm * 10">{{ cm }}</span>
+                  }
+                  <div
+                    class="indent-marker"
+                    [style.left.mm]="pageSetup.marginLeftMm + firstLineIndentMm()"
+                    title="First-line Indent Marker"
+                  >▼</div>
+                </div>
               </div>
-            }
+            </div>
+          }
 
-            <div class="canvas-row-wrap">
-              @if (showRulers()) {
-                <div class="vertical-ruler" [style.minHeight.mm]="effectivePageHeightMm()">
+          <div
+            class="canvas-viewport"
+            (mousemove)="onCanvasMouseMove($event)"
+            (mouseup)="onCanvasMouseUp()"
+          >
+            @if (showRulers()) {
+              <div class="word-left-ruler-rail">
+                <div
+                  class="vertical-ruler"
+                  [style.zoom]="zoomPercent() + '%'"
+                  [style.minHeight.mm]="effectivePageHeightMm()"
+                  [style.height.mm]="effectivePageHeightMm()"
+                >
+                  <div class="ruler-margin-band ruler-band-top" [style.height.mm]="pageSetup.marginTopMm"></div>
+                  <div class="ruler-margin-band ruler-band-bottom" [style.height.mm]="pageSetup.marginBottomMm"></div>
                   @for (cm of verticalRulerTicks(); track cm) {
                     <span class="v-ruler-tick" [style.top.mm]="cm * 10">{{ cm }}</span>
                   }
                 </div>
-              }
+              </div>
+            }
 
-              <!-- Paginated Physical Sheet (Microsoft Word A4 Paper) -->
-              <div
-                class="page-sheet"
-                [class.show-gridlines]="showGridlines"
-                [style.width.mm]="effectivePageWidthMm()"
-                [style.minHeight.mm]="effectivePageHeightMm()"
-                [style.paddingTop.mm]="pageSetup.marginTopMm"
-                [style.paddingBottom.mm]="pageSetup.marginBottomMm"
-                [style.paddingLeft.mm]="pageSetup.marginLeftMm"
-                [style.paddingRight.mm]="pageSetup.marginRightMm"
-                (dragover)="onCanvasDragOver($event)"
-                (drop)="onCanvasDrop($event)"
-              >
-                <!-- Subtle MS Word Margin Crop Marks -->
-                <span class="crop-mark crop-tl" [style.top.mm]="pageSetup.marginTopMm" [style.left.mm]="pageSetup.marginLeftMm"></span>
-                <span class="crop-mark crop-tr" [style.top.mm]="pageSetup.marginTopMm" [style.right.mm]="pageSetup.marginRightMm"></span>
-                <span class="crop-mark crop-bl" [style.bottom.mm]="pageSetup.marginBottomMm" [style.left.mm]="pageSetup.marginLeftMm"></span>
-                <span class="crop-mark crop-br" [style.bottom.mm]="pageSetup.marginBottomMm" [style.right.mm]="pageSetup.marginRightMm"></span>
+            <div class="canvas-page-area">
+              <div class="canvas-zoom-stage" [style.zoom]="zoomPercent() + '%'">
+                <!-- Paginated Physical Sheet (Microsoft Word A4 Paper) -->
+                <div
+                  class="page-sheet"
+                  [class.show-gridlines]="showGridlines"
+                  [style.width.mm]="effectivePageWidthMm()"
+                  [style.minHeight.mm]="effectivePageHeightMm()"
+                  [style.paddingTop.mm]="pageSetup.marginTopMm"
+                  [style.paddingBottom.mm]="pageSetup.marginBottomMm"
+                  [style.paddingLeft.mm]="pageSetup.marginLeftMm"
+                  [style.paddingRight.mm]="pageSetup.marginRightMm"
+                  (dragover)="onCanvasDragOver($event)"
+                  (drop)="onCanvasDrop($event)"
+                >
+                  <!-- Subtle MS Word Margin Crop Marks -->
+                  <span class="crop-mark crop-tl" [style.top.mm]="pageSetup.marginTopMm" [style.left.mm]="pageSetup.marginLeftMm"></span>
+                  <span class="crop-mark crop-tr" [style.top.mm]="pageSetup.marginTopMm" [style.right.mm]="pageSetup.marginRightMm"></span>
+                  <span class="crop-mark crop-bl" [style.bottom.mm]="pageSetup.marginBottomMm" [style.left.mm]="pageSetup.marginLeftMm"></span>
+                  <span class="crop-mark crop-br" [style.bottom.mm]="pageSetup.marginBottomMm" [style.right.mm]="pageSetup.marginRightMm"></span>
 
-                <!-- Watermark Layer -->
-                @if (watermark.enabled) {
-                  <div
-                    class="watermark-layer"
-                    [style.opacity]="watermark.opacity"
-                  >
-                    @if (watermark.type === 'Image' && watermark.imageUrl) {
-                      <img
-                        [src]="watermark.imageUrl"
-                        [style.transform]="'rotate(' + watermark.rotationDeg + 'deg)'"
-                        alt="Watermark"
-                      />
-                    } @else {
-                      <span
-                        [style.color]="watermark.color"
-                        [style.fontSize.pt]="watermark.fontSizePt"
-                        [style.transform]="'rotate(' + watermark.rotationDeg + 'deg)'"
-                      >
-                        {{ watermark.text }}
-                      </span>
-                    }
+                  <!-- Watermark Layer -->
+                  @if (watermark.enabled) {
+                    <div
+                      class="watermark-layer"
+                      [style.opacity]="watermark.opacity"
+                    >
+                      @if (watermark.type === 'Image' && watermark.imageUrl) {
+                        <img
+                          [src]="watermark.imageUrl"
+                          [style.transform]="'rotate(' + watermark.rotationDeg + 'deg)'"
+                          alt="Watermark"
+                        />
+                      } @else {
+                        <span
+                          [style.color]="watermark.color"
+                          [style.fontSize.pt]="watermark.fontSizePt"
+                          [style.transform]="'rotate(' + watermark.rotationDeg + 'deg)'"
+                        >
+                          {{ watermark.text }}
+                        </span>
+                      }
+                    </div>
+                  }
+
+                  <!-- Repeating Page Header Region -->
+                  <div class="sheet-region header-region" [class.region-focused]="activeEditorRegion() === 'header'">
+                    <div class="region-badge">Header</div>
+                    <div
+                      #headerEditor
+                      class="editable-surface header-surface"
+                      contenteditable="true"
+                      (focus)="activeEditorRegion.set('header')"
+                      (mousedown)="onEditorMouseDown($event)"
+                      (keyup)="onEditorKeyUp()"
+                      (mouseup)="onEditorMouseUp()"
+                      (paste)="onEditorPaste($event)"
+                      (contextmenu)="onCanvasRightClick($event)"
+                    ></div>
                   </div>
-                }
 
-                <!-- Repeating Page Header Region -->
-                <div class="sheet-region header-region" [class.region-focused]="activeEditorRegion() === 'header'">
-                  <div class="region-badge">Header</div>
-                  <div
-                    #headerEditor
-                    class="editable-surface header-surface"
-                    contenteditable="true"
-                    (focus)="activeEditorRegion.set('header')"
-                    (mousedown)="onEditorMouseDown($event)"
-                    (keyup)="onEditorKeyUp()"
-                    (mouseup)="onEditorMouseUp()"
-                    (paste)="onEditorPaste($event)"
-                    (contextmenu)="onCanvasRightClick($event)"
-                  ></div>
-                </div>
+                  <!-- Main Multi-Column Rich Text Body Region -->
+                  <div class="sheet-region body-region">
+                    <div
+                      #bodyEditor
+                      class="editable-surface body-surface"
+                      contenteditable="true"
+                      [style.columnCount]="pageSetup.columns"
+                      [style.columnGap.mm]="8"
+                      (focus)="activeEditorRegion.set('body')"
+                      (mousedown)="onEditorMouseDown($event)"
+                      (keyup)="onEditorKeyUp()"
+                      (mouseup)="onEditorMouseUp()"
+                      (paste)="onEditorPaste($event)"
+                      (contextmenu)="onCanvasRightClick($event)"
+                    ></div>
+                  </div>
 
-                <!-- Main Multi-Column Rich Text Body Region -->
-                <div class="sheet-region body-region">
-                  <div
-                    #bodyEditor
-                    class="editable-surface body-surface"
-                    contenteditable="true"
-                    [style.columnCount]="pageSetup.columns"
-                    [style.columnGap.mm]="8"
-                    (focus)="activeEditorRegion.set('body')"
-                    (mousedown)="onEditorMouseDown($event)"
-                    (keyup)="onEditorKeyUp()"
-                    (mouseup)="onEditorMouseUp()"
-                    (paste)="onEditorPaste($event)"
-                    (contextmenu)="onCanvasRightClick($event)"
-                  ></div>
-                </div>
-
-                <!-- Repeating Page Footer Region -->
-                <div class="sheet-region footer-region" [class.region-focused]="activeEditorRegion() === 'footer'">
-                  <div class="region-badge">Footer</div>
-                  <div
-                    #footerEditor
-                    class="editable-surface footer-surface"
-                    contenteditable="true"
-                    (focus)="activeEditorRegion.set('footer')"
-                    (mousedown)="onEditorMouseDown($event)"
-                    (keyup)="onEditorKeyUp()"
-                    (mouseup)="onEditorMouseUp()"
-                    (paste)="onEditorPaste($event)"
-                    (contextmenu)="onCanvasRightClick($event)"
-                  ></div>
+                  <!-- Repeating Page Footer Region -->
+                  <div class="sheet-region footer-region" [class.region-focused]="activeEditorRegion() === 'footer'">
+                    <div class="region-badge">Footer</div>
+                    <div
+                      #footerEditor
+                      class="editable-surface footer-surface"
+                      contenteditable="true"
+                      (focus)="activeEditorRegion.set('footer')"
+                      (mousedown)="onEditorMouseDown($event)"
+                      (keyup)="onEditorKeyUp()"
+                      (mouseup)="onEditorMouseUp()"
+                      (paste)="onEditorPaste($event)"
+                      (contextmenu)="onCanvasRightClick($event)"
+                    ></div>
+                  </div>
                 </div>
               </div>
+
+              <!-- Auto-Compiled Parameterized SQL Drawer -->
+              @if (showSqlDrawer()) {
+                <div class="sql-drawer">
+                  <div class="sql-drawer-header">
+                    <strong>⚡ Auto-Compiled Parameterized LEFT JOIN T-SQL Query</strong>
+                    <span>Anchor: {{ anchorTable() || 'None (Zero-State)' }} | Joins: {{ resolvedJoinPath().length }}</span>
+                  </div>
+                  <pre class="sql-code">{{ compiledSqlPreview() }}</pre>
+                </div>
+              }
             </div>
           </div>
-
-          <!-- Auto-Compiled Parameterized SQL Drawer -->
-          @if (showSqlDrawer()) {
-            <div class="sql-drawer">
-              <div class="sql-drawer-header">
-                <strong>⚡ Auto-Compiled Parameterized LEFT JOIN T-SQL Query</strong>
-                <span>Anchor: {{ anchorTable() || 'None (Zero-State)' }} | Joins: {{ resolvedJoinPath().length }}</span>
-              </div>
-              <pre class="sql-code">{{ compiledSqlPreview() }}</pre>
-            </div>
-          }
         </div>
 
         <!-- Right Sidebar: FK-Governed Database Fields & Runtime Filter Builder -->
@@ -1596,28 +1618,118 @@ import {
     .workspace-split.sidebar-collapsed {
       grid-template-columns: minmax(0, 1fr);
     }
+    .canvas-main-column {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      background: #edebe9;
+    }
+    .word-top-ruler-bar {
+      flex: 0 0 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      background: #e1dfdd;
+      border-bottom: 1px solid #c8c6c4;
+      z-index: 20;
+    }
+    .ruler-corner-box {
+      flex: 0 0 24px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f3f2f1;
+      border-right: 1px solid #c8c6c4;
+      font-size: 11px;
+      color: #605e5c;
+      user-select: none;
+    }
+    .top-ruler-track-viewport {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0 28px;
+      overflow: hidden;
+    }
     .canvas-viewport {
+      flex: 1 1 0%;
       height: 100%;
       min-height: 0;
       min-width: 0;
       overflow-y: scroll;
       overflow-x: auto;
-      padding: 16px 24px 80px;
-      display: block;
+      padding: 0;
+      display: flex;
+      align-items: flex-start;
       position: relative;
       background: #edebe9;
+    }
+    .word-left-ruler-rail {
+      position: sticky;
+      left: 0;
+      flex: 0 0 24px;
+      width: 24px;
+      min-height: 100%;
+      background: #e1dfdd;
+      border-right: 1px solid #c8c6c4;
+      z-index: 15;
+      display: flex;
+      justify-content: center;
+      padding-top: 20px;
+      padding-bottom: 80px;
+    }
+    .canvas-page-area {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 28px 80px;
     }
     .canvas-zoom-stage {
       width: fit-content;
       margin: 0 auto;
     }
     .horizontal-ruler {
-      height: 20px;
+      height: 18px;
       background: #ffffff;
       border: 1px solid #c8c6c4;
       position: relative;
-      margin: 0 auto 6px;
+      overflow: hidden;
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .ruler-margin-band {
+      background: #d2d0ce;
+      position: absolute;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .ruler-band-left {
+      left: 0;
+      top: 0;
+      bottom: 0;
+    }
+    .ruler-band-right {
+      right: 0;
+      top: 0;
+      bottom: 0;
+    }
+    .ruler-band-top {
+      top: 0;
+      left: 0;
+      right: 0;
+    }
+    .ruler-band-bottom {
+      bottom: 0;
+      left: 0;
+      right: 0;
     }
     .ruler-tick {
       position: absolute;
@@ -1627,6 +1739,7 @@ import {
       border-left: 1px solid #a19f9d;
       padding-left: 2px;
       height: 14px;
+      z-index: 2;
     }
     .indent-marker {
       position: absolute;
@@ -1634,21 +1747,14 @@ import {
       color: #185abd;
       font-size: 10px;
       font-weight: 700;
-    }
-    .canvas-row-wrap {
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      gap: 6px;
-      width: fit-content;
-      margin: 0 auto;
-      padding-bottom: 36px;
+      z-index: 2;
     }
     .vertical-ruler {
-      width: 20px;
+      width: 18px;
       background: #ffffff;
       border: 1px solid #c8c6c4;
       position: relative;
+      overflow: hidden;
     }
     .v-ruler-tick {
       position: absolute;
@@ -1657,6 +1763,7 @@ import {
       color: #605e5c;
       border-top: 1px solid #a19f9d;
       width: 14px;
+      z-index: 2;
     }
     .page-sheet {
       background: #ffffff;
